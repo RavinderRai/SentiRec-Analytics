@@ -1,13 +1,13 @@
-# Headphone-Finder
+# Sentirec Analytics
 ## Introduction
 
-Welcome to the Wireless Earbuds Recommendation Website! This web application is designed to help users find the perfect wireless earbuds based on their preferences. Whether you're looking for affordable options, noise-canceling features, or specific brands, our recommendation engine utilizes machine learning and a comprehensive database of 25-50 popular headphones to provide you with tailored suggestions.
+A web application designed to speed up the process of finding a product (in the current iteration we are focusing on headphones) faster. It uses NLP to summarize text and perform sentiment analysis with the goal of showing a dashboard in the end. Recommendations are given using the cosine similarity based on a user text input and product summaries.
 
 ## Features
 
-- **Personalized Recommendations:** Users can input their budget, desired features (e.g., noise cancellation), and other preferences to receive customized headphone recommendations.
+- **Personalized Recommendations:** Users can input what they are looking for via text input.
 
-- **Machine Learning:** Our recommendation engine uses advanced machine learning algorithms to analyze user inputs and provide accurate suggestions.
+- **Machine Learning:** Our recommendation engine uses HuggingFace libraries for text summarization and sentiment analysis on product reviews.
 
 - **Extensive Database:** We have compiled a database of 25-50 popular wireless earbuds, ensuring a wide range of options for users to explore.
 
