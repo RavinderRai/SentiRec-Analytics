@@ -1,1 +1,5 @@
 config.json
+glove_model.gensim
+glove_model.gensim.vectors.npy
+modules/pegasus-individual-reviews/
+modules/wandb/
