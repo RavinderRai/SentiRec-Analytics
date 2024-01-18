@@ -1,34 +1,58 @@
-import pyodbc
+import pandas as pd
+from sqlalchemy import create_engine, inspect
+import dash
+from dash import dcc, html
+import plotly.express as px
 
 # Connection parameters
 server = 'RAVI-DESKTOP\SQLEXPRESS01'
 database = 'SentiRec_Analytics'
 username = 'RAVI-DESKTOP\RaviB'
-driver = '{SQL Server}'
 
-# Create a connection string
-connection_string = f'DRIVER={driver};SERVER={server};DATABASE={database};Trusted_Connection=yes;'
+# Connection parameters
+driver = 'ODBC+Driver+17+for+SQL+Server'  # Adjust the driver name if needed
+
+# Create an SQLAlchemy engine
+engine = create_engine(f"mssql+pyodbc://{server}/{database}?driver={driver}")
+
+dataframes_dict = {}
 
 try:
-    # Establish a connection
-    connection = pyodbc.connect(connection_string)
+    # Create an inspector to inspect the database and get the tables names
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
 
-    # Create a cursor from the connection
-    cursor = connection.cursor()
+    # Load each table into a Pandas DataFrame
+    for table_name in table_names:
+        df = pd.read_sql_table(table_name, con=engine)
+        # Display or process the DataFrame as needed
+        dataframes_dict[table_name] = df
+    
 
-    # Execute a simple query
-    cursor.execute("SELECT 1")
 
-    # Fetch the result
-    result = cursor.fetchone()
-
-    # Print the result
-    print("Connection successful. Result:", result)
-
-except pyodbc.Error as e:
-    print("Error connecting to the database:", e)
+except pd.errors.DatabaseError as e:
+    print("Error reading from the database:", e)
 
 finally:
-    # Close the cursor and connection
-    cursor.close()
-    connection.close()
+    # Dispose of the engine
+    engine.dispose()
+    
+
+headphones_fact_table = dataframes_dict['headphones_fact_table']
+    
+external_stylesheets = ['https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css']
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
+app.css.append_css({
+    'external_url': 'https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css'
+})
+
+app.layout = html.Div([
+    dcc.Graph(
+        id='numeric-chart',
+        figure=px.scatter(headphones_fact_table, x='batteryScore', y='comfortScore', title='Numeric Chart')
+    )
+])
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
