@@ -36,21 +36,19 @@ except pd.errors.DatabaseError as e:
 finally:
     # Dispose of the engine
     engine.dispose()
-    
+
 
 headphones_fact_table = dataframes_dict['headphones_fact_table']
     
 external_stylesheets = ['https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
-app.css.append_css({
-    'external_url': 'https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css'
-})
+
 
 app.layout = html.Div([
     dcc.Graph(
         id='numeric-chart',
-        figure=px.scatter(headphones_fact_table, x='batteryScore', y='comfortScore', title='Numeric Chart')
+        figure=px.scatter(headphones_fact_table, x='batteryScore', y='comfortScore', title='Numeric Dot Chart')
     )
 ])
 
