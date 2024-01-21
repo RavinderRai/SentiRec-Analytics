@@ -61,13 +61,6 @@ prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(
 
 app.layout = html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '800px'}, children=[
    
-    html.Div(
-        id='testing-text-info',
-        children=[
-            'Testing Text',
-            html.Span(id='output-2', children=''),
-        ]
-    ),
     
     html.Label('Select Headphone:'),
     dcc.Dropdown(
@@ -76,33 +69,62 @@ app.layout = html.Div(style={'backgroundColor': custom_colors['background'], 'co
         value=prod_descriptions['headphoneName'][0]
     ),
     
+    
+    html.Div(id='brand-name'),
+    html.Div(id='star-rating', className='star-rating'),
+    html.Div(id='review-count'),
     dcc.Graph(id='rating-distribution'),
     html.Div(id='description-text')
 ])
 
 @app.callback(
-    [Output('rating-distribution', 'figure'),
+    [Output('brand-name', 'children'),
+     Output('review-count', 'children'),
+     Output('star-rating', 'children'),
+     Output('rating-distribution', 'figure'),
      Output('description-text', 'children')],
     [Input('headphone-dropdown', 'value')]
 )
 def update_chart(selected_headphone):
     selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
     
+    review_count = selected_row['reviewsCount']
+    brand_name = selected_row['brand']
+    star_rating = selected_row['stars']
+    
+    #cleaning the text to get the number of stars labels
+    #helper function - need to add a space between number and star, and make star plural
+    def clean_star_label(xstars):
+        if xstars[0] != '1':
+            return xstars[0] + ' ' + xstars[1:] + 's'
+        else:
+            return xstars[0] + ' ' + xstars[1:]
+            
+    stars_labels = [clean_star_label(stars) for stars in list(selected_row['starsBreakdown'].keys())]
+    
+    # Calculate percentages for each value in starsBreakdown
+    values = list(selected_row['starsBreakdown'].values())
+    total = sum(values)
+    percentages = [(value / total) * 100 for value in values]
+    
     # Create bar chart
     fig = {
         'data': [{
-            'x': list(selected_row['starsBreakdown'].keys()), 
-            'y': list(selected_row['starsBreakdown'].values()), 
+            'x': stars_labels, 
+            'y': percentages, 
             'type': 'bar', 
             #'marker': {'color': color_scale}
         }],
         
-        'layout': {'title': f'Ratings Distribution for {selected_headphone}'}
+        'layout': {
+            'title': f'Ratings Distribution for {selected_headphone}',
+            'yaxis': {'tickvals': percentages, 'ticktext': [f'{val:.1f}%' for val in percentages]}
+        }
     }
     
     description_text = selected_row['description']
     
-    return fig, description_text
+    return f'Total Number of Reviews: {review_count}', f'Overall Rating: {star_rating}', f'Brand Name: {brand_name}', fig, description_text
 
 if __name__ == '__main__':
     app.run_server(debug=True)
