@@ -74,15 +74,16 @@ app.layout = html.Div(style={'backgroundColor': custom_colors['background'], 'co
     html.Div(id='star-rating', className='star-rating'),
     html.Div(id='review-count'),
     dcc.Graph(id='rating-distribution'),
-    html.Div(id='description-text')
+    html.H3("Features:"),
+    html.Div(id='features-text', style={'margin-top': '20px'})
 ])
 
 @app.callback(
     [Output('brand-name', 'children'),
-     Output('review-count', 'children'),
      Output('star-rating', 'children'),
+     Output('review-count', 'children'),
      Output('rating-distribution', 'figure'),
-     Output('description-text', 'children')],
+     Output('features-text', 'children')],
     [Input('headphone-dropdown', 'value')]
 )
 def update_chart(selected_headphone):
@@ -122,9 +123,12 @@ def update_chart(selected_headphone):
         }
     }
     
-    description_text = selected_row['description']
+    #description_text = selected_row['description']
     
-    return f'Total Number of Reviews: {review_count}', f'Overall Rating: {star_rating}', f'Brand Name: {brand_name}', fig, description_text
+    features_text = ast.literal_eval(selected_row['features'])
+    features_text = html.Div([dcc.Markdown(f'- {feature}') for feature in features_text])
+    
+    return f'Brand Name: {brand_name}', f'Overall Rating: {star_rating}', f'Total Number of Reviews: {review_count}', fig, features_text
 
 if __name__ == '__main__':
     app.run_server(debug=True)
