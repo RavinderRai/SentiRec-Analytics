@@ -5,6 +5,7 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.express as px
+import dash_bootstrap_components as dbc
 
 # Connection parameters
 server = 'RAVI-DESKTOP\SQLEXPRESS01'
@@ -44,7 +45,7 @@ headphones_fact_table = dataframes_dict['headphones_fact_table']
 prod_descriptions = dataframes_dict['amazon_product_descriptions']
     
 #external_stylesheets = ['https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css']
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 color_scale = px.colors.sequential.Viridis
 custom_colors = {
@@ -58,7 +59,7 @@ custom_colors = {
 prod_descriptions = prod_descriptions.drop(prod_descriptions[prod_descriptions['headphoneName'] == 'AirPods 3'].index)
 prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(ast.literal_eval)
 
-
+"""
 app.layout = html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '800px'}, children=[
    
     
@@ -77,6 +78,55 @@ app.layout = html.Div(style={'backgroundColor': custom_colors['background'], 'co
     html.H3("Features:"),
     html.Div(id='features-text', style={'margin-top': '20px'})
 ])
+"""
+
+app.layout = dbc.Container([
+    dbc.Row([
+        
+            html.H1('SentiRec Analytics'),
+            html.Label('Select Headphone:'),
+            dcc.Dropdown(
+                    id='headphone-dropdown',
+                    options=[{'label': headphone, 'value': headphone} for headphone in prod_descriptions['headphoneName']],
+                    value=prod_descriptions['headphoneName'][0]
+                ),
+        ]
+    ),
+    dbc.Row([
+        dbc.Col(
+            [html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '800px'}, children=[
+
+            
+
+            html.Div(id='brand-name'),
+            html.Div(id='star-rating', className='star-rating'),
+            html.Div(id='review-count'),
+            dcc.Graph(id='rating-distribution'),
+            html.H3("Features:"),
+            html.Div(id='features-text', style={'margin-top': '20px'})
+            ])
+        ], width=4),
+        dbc.Col([
+            html.H4('Test'),
+        ], width=4),
+        dbc.Col([
+            html.H4('Test'),
+        ], width=4)
+    ]),
+    
+    dbc.Row([
+        dbc.Col([
+            html.H4('Test2')
+        ], width=4),
+        dbc.Col([
+            html.H4('Test3')
+        ], width=4),
+        dbc.Col([
+            html.H4('Test1'),
+        ], width=4)
+    ]),
+])
+
 
 @app.callback(
     [Output('brand-name', 'children'),
