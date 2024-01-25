@@ -43,6 +43,12 @@ finally:
 
 headphones_fact_table = dataframes_dict['headphones_fact_table']
 prod_descriptions = dataframes_dict['amazon_product_descriptions']
+
+#remember to get rid of nulls, NA's, etc. - ASSERT it
+battery_df = headphones_fact_table[['headphoneName', 'batteryLabel', 'batteryScore']]
+comfort_df = headphones_fact_table[['headphoneName', 'comfortLabel', 'comfortScore']]
+noisecancellation_df = headphones_fact_table[['headphoneName', 'noisecancellationLabel', 'noisecancellationScore']]
+soundquality_df = headphones_fact_table[['headphoneName', 'soundqualityLabel', 'soundqualityScore']]
     
 #external_stylesheets = ['https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css']
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -59,26 +65,6 @@ custom_colors = {
 prod_descriptions = prod_descriptions.drop(prod_descriptions[prod_descriptions['headphoneName'] == 'AirPods 3'].index)
 prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(ast.literal_eval)
 
-"""
-app.layout = html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '800px'}, children=[
-   
-    
-    html.Label('Select Headphone:'),
-    dcc.Dropdown(
-        id='headphone-dropdown',
-        options=[{'label': headphone, 'value': headphone} for headphone in prod_descriptions['headphoneName']],
-        value=prod_descriptions['headphoneName'][0]
-    ),
-    
-    
-    html.Div(id='brand-name'),
-    html.Div(id='star-rating', className='star-rating'),
-    html.Div(id='review-count'),
-    dcc.Graph(id='rating-distribution'),
-    html.H3("Features:"),
-    html.Div(id='features-text', style={'margin-top': '20px'})
-])
-"""
 
 app.layout = dbc.Container([
     dbc.Row([
@@ -109,9 +95,18 @@ app.layout = dbc.Container([
         dbc.Col([
             html.H4('Test'),
         ], width=4),
+        
         dbc.Col([
-            html.H4('Test'),
-        ], width=4)
+            html.H4('ABSA'),
+            dcc.Dropdown(
+            id='label-dropdown',
+            options=[{'label': label, 'value': label} for label in headphones_fact_table['batteryLabel'].unique()],
+            value=headphones_fact_table['batteryLabel'].unique()[0],
+            multi=False,
+            placeholder='Select a Battery Label'
+            ),
+        dcc.Graph(id='sentiment-distribution')
+            ], width=4)
     ]),
     
     dbc.Row([
@@ -179,6 +174,21 @@ def update_chart(selected_headphone):
     features_text = html.Div([dcc.Markdown(f'- {feature}') for feature in features_text])
     
     return f'Brand Name: {brand_name}', f'Overall Rating: {star_rating}', f'Total Number of Reviews: {review_count}', fig, features_text
+
+@app.callback(
+    dash.dependencies.Output('sentiment-distribution', 'figure'),
+    [dash.dependencies.Input('headphone-dropdown', 'value'),
+     dash.dependencies.Input('label-dropdown', 'value')]
+)
+def update_graph(selected_headphone, selected_label):
+    filtered_df = headphones_fact_table[(headphones_fact_table['headphoneName'] == selected_headphone) & (headphones_fact_table['batteryLabel'] == selected_label)]
+    
+    fig = px.histogram(filtered_df, x='batteryScore', nbins=10, color='batteryLabel',
+                       labels={'batteryScore': 'Sentiment Score'}, opacity=0.7)
+    
+    fig.update_layout(title=f'Sentiment Distribution for {selected_headphone} ({selected_label} Battery)',
+                      xaxis_title='Sentiment Score', yaxis_title='Frequency')
+    return fig
 
 if __name__ == '__main__':
     app.run_server(debug=True)
