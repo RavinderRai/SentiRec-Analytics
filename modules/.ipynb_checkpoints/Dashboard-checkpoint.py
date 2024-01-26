@@ -67,9 +67,10 @@ prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(
 
 
 app.layout = dbc.Container([
+    # Main Title/Header at the top of page
     dbc.Row([
         
-            html.H1('SentiRec Analytics'),
+            html.H1('SentiRec Analytics', style={'text-align': 'center'}),
             html.Label('Select Headphone:'),
             dcc.Dropdown(
                     id='headphone-dropdown',
@@ -78,11 +79,11 @@ app.layout = dbc.Container([
                 ),
         ]
     ),
+    # first row
     dbc.Row([
+        #left column with review ratings analytics
         dbc.Col(
             [html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '800px'}, children=[
-
-            
 
             html.Div(id='brand-name'),
             html.Div(id='star-rating', className='star-rating'),
@@ -92,21 +93,29 @@ app.layout = dbc.Container([
             html.Div(id='features-text', style={'margin-top': '20px'})
             ])
         ], width=4),
+        
+        #middle column with picture and amazon link
         dbc.Col([
-            html.H4('Test'),
+            html.H4('Amazon Picture and Link', style={'text-align': 'center'}),
         ], width=4),
         
+        #right column with aspect based sentiment analysis analytics
         dbc.Col([
-            html.H4('ABSA'),
+            html.H4('ABSA', style={'text-align': 'center'}),
             dcc.Dropdown(
-            id='label-dropdown',
-            options=[{'label': label, 'value': label} for label in headphones_fact_table['batteryLabel'].unique()],
-            value=headphones_fact_table['batteryLabel'].unique()[0],
-            multi=False,
-            placeholder='Select a Battery Label'
+                id='aspect-dropdown',
+                options=[
+                    {'label': 'Battery', 'value': 'battery'},
+                    {'label': 'Comfort', 'value': 'comfort'},
+                    {'label': 'Sound Quality', 'value': 'sound_quality'},
+                    {'label': 'Noise Cancellation', 'value': 'noise_cancellation'}
+                ],
+                value='battery',
+                multi=False,
+                placeholder='Select an Aspect'
             ),
-        dcc.Graph(id='sentiment-distribution')
-            ], width=4)
+            dcc.Graph(id='sentiment-distribution')
+        ], width=4)
     ]),
     
     dbc.Row([
@@ -178,17 +187,32 @@ def update_chart(selected_headphone):
 @app.callback(
     dash.dependencies.Output('sentiment-distribution', 'figure'),
     [dash.dependencies.Input('headphone-dropdown', 'value'),
-     dash.dependencies.Input('label-dropdown', 'value')]
+     dash.dependencies.Input('aspect-dropdown', 'value')]
 )
-def update_graph(selected_headphone, selected_label):
-    filtered_df = headphones_fact_table[(headphones_fact_table['headphoneName'] == selected_headphone) & (headphones_fact_table['batteryLabel'] == selected_label)]
+def update_graph(selected_headphone, selected_aspect):
+    #showing a distribution of the sentiments per aspect
+    if selected_aspect == 'battery':
+        filtered_df = battery_df[battery_df['headphoneName'] == selected_headphone]
+    elif selected_aspect == 'comfort':
+        filtered_df = comfort_df[comfort_df['headphoneName'] == selected_headphone]
+    elif selected_aspect == 'sound_quality':
+        filtered_df = soundquality_df[soundquality_df['headphoneName'] == selected_headphone]
+    elif selected_aspect == 'noise_cancellation':
+        filtered_df = noisecancellation_df[noisecancellation_df['headphoneName'] == selected_headphone]
+
+    fig = px.histogram(filtered_df, 
+                       x=f'{selected_aspect}Score', nbins=10,
+                       color=f'{selected_aspect}Label', 
+                       labels={f'{selected_aspect}Score': 'Sentiment Score'},
+                       opacity=0.7)
     
-    fig = px.histogram(filtered_df, x='batteryScore', nbins=10, color='batteryLabel',
-                       labels={'batteryScore': 'Sentiment Score'}, opacity=0.7)
-    
-    fig.update_layout(title=f'Sentiment Distribution for {selected_headphone} ({selected_label} Battery)',
-                      xaxis_title='Sentiment Score', yaxis_title='Frequency')
+    fig.update_layout(title=f'Sentiment Distribution for {selected_headphone} ({selected_aspect.replace("_", " ").title()})',
+                      xaxis_title='Sentiment Score', 
+                      yaxis_title='Frequency',
+                      legend=dict(x=0, y=1, traceorder='normal', orientation='h')
+                     )
     return fig
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
