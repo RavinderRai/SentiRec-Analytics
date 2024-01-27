@@ -5,6 +5,7 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.express as px
+import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
 
 # Connection parameters
@@ -44,12 +45,23 @@ finally:
 headphones_fact_table = dataframes_dict['headphones_fact_table']
 prod_descriptions = dataframes_dict['amazon_product_descriptions']
 
-#remember to get rid of nulls, NA's, etc. - ASSERT it
-battery_df = headphones_fact_table[['headphoneName', 'batteryLabel', 'batteryScore']]
-comfort_df = headphones_fact_table[['headphoneName', 'comfortLabel', 'comfortScore']]
-noisecancellation_df = headphones_fact_table[['headphoneName', 'noisecancellationLabel', 'noisecancellationScore']]
-soundquality_df = headphones_fact_table[['headphoneName', 'soundqualityLabel', 'soundqualityScore']]
+#getting df's for each aspect and leaving out rows with 0 scores
+battery_df = headphones_fact_table[['headphoneName', 'batteryLabel', 'batteryScore']].loc[headphones_fact_table['batteryScore'] != 0]
+
+comfort_df = headphones_fact_table[['headphoneName', 'comfortLabel', 'comfortScore']].loc[headphones_fact_table['comfortScore'] != 0]
+
+noisecancellation_df = headphones_fact_table[['headphoneName', 'noisecancellationLabel', 'noisecancellationScore']].loc[headphones_fact_table['noisecancellationScore'] != 0]
+
+soundquality_df = headphones_fact_table[['headphoneName', 'soundqualityLabel', 'soundqualityScore']].loc[headphones_fact_table['soundqualityScore'] != 0]
     
+assert (battery_df['batteryScore'] == 0).sum() == 0, "There are zero values in the 'batteryScore' column."
+assert (comfort_df['comfortScore'] == 0).sum() == 0, "There are zero values in the 'batteryScore' column."
+assert (noisecancellation_df['noisecancellationScore'] == 0).sum() == 0, "There are zero values in the 'noisecancellationScore' column."
+assert (soundquality_df['soundqualityScore'] == 0).sum() == 0, "There are zero values in the 'soundqualityScore' column."
+
+
+
+
 #external_stylesheets = ['https://stackpath.bootstrapcdn.com/bootswatch/4.5.0/lux/bootstrap.min.css']
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -99,16 +111,21 @@ app.layout = dbc.Container([
             html.H4('Amazon Picture and Link', style={'text-align': 'center'}),
         ], width=4),
         
+        
+        
         #right column with aspect based sentiment analysis analytics
         dbc.Col([
             html.H4('ABSA', style={'text-align': 'center'}),
+            
+            dcc.Graph(id='grouped-bar-chart'),
+            
             dcc.Dropdown(
                 id='aspect-dropdown',
                 options=[
                     {'label': 'Battery', 'value': 'battery'},
                     {'label': 'Comfort', 'value': 'comfort'},
-                    {'label': 'Sound Quality', 'value': 'sound_quality'},
-                    {'label': 'Noise Cancellation', 'value': 'noise_cancellation'}
+                    {'label': 'Sound Quality', 'value': 'soundquality'},
+                    {'label': 'Noise Cancellation', 'value': 'noisecancellation'}
                 ],
                 value='battery',
                 multi=False,
@@ -185,9 +202,9 @@ def update_chart(selected_headphone):
     return f'Brand Name: {brand_name}', f'Overall Rating: {star_rating}', f'Total Number of Reviews: {review_count}', fig, features_text
 
 @app.callback(
-    dash.dependencies.Output('sentiment-distribution', 'figure'),
-    [dash.dependencies.Input('headphone-dropdown', 'value'),
-     dash.dependencies.Input('aspect-dropdown', 'value')]
+    Output('sentiment-distribution', 'figure'),
+    [Input('headphone-dropdown', 'value'),
+     Input('aspect-dropdown', 'value')]
 )
 def update_graph(selected_headphone, selected_aspect):
     #showing a distribution of the sentiments per aspect
@@ -195,9 +212,9 @@ def update_graph(selected_headphone, selected_aspect):
         filtered_df = battery_df[battery_df['headphoneName'] == selected_headphone]
     elif selected_aspect == 'comfort':
         filtered_df = comfort_df[comfort_df['headphoneName'] == selected_headphone]
-    elif selected_aspect == 'sound_quality':
+    elif selected_aspect == 'soundquality':
         filtered_df = soundquality_df[soundquality_df['headphoneName'] == selected_headphone]
-    elif selected_aspect == 'noise_cancellation':
+    elif selected_aspect == 'noisecancellation':
         filtered_df = noisecancellation_df[noisecancellation_df['headphoneName'] == selected_headphone]
 
     fig = px.histogram(filtered_df, 
@@ -212,6 +229,54 @@ def update_graph(selected_headphone, selected_aspect):
                       legend=dict(x=0, y=1, traceorder='normal', orientation='h')
                      )
     return fig
+
+@app.callback(
+    Output('grouped-bar-chart', 'figure'),
+    [Input('headphone-dropdown', 'value'),
+     Input('grouped-bar-chart', 'relayoutData')]
+)
+def update_grouped_bar_chart(selected_headphone, relayout_data):
+    # Create a grouped bar chart using plotly.graph_objects.Figure
+    fig = go.Figure()
+
+    # Check if a headphone is selected
+    if selected_headphone:
+        # Iterate through each sentiment label and add bars to the figure
+        for sentiment_label, color in zip(['Positive', 'Negative'], ['blue', 'orange']):
+            averages = []
+            labels = []
+
+            # Iterate through each DataFrame and calculate the average score for the sentiment label
+            for df in [battery_df, comfort_df, noisecancellation_df, soundquality_df]:
+                filtered_df = df[df['headphoneName'] == selected_headphone]
+
+                # Check if the filtered DataFrame is not empty
+                if not filtered_df.empty:
+                    aspect_name = filtered_df.columns[1].replace('Label', '')
+                    avg_score = filtered_df[filtered_df['{}Label'.format(aspect_name)] == sentiment_label]['{}Score'.format(aspect_name)].mean()
+                    averages.append(avg_score)
+                    labels.append(aspect_name)
+
+            fig.add_trace(go.Bar(
+                x=labels,
+                y=averages,
+                name=sentiment_label,
+                marker=dict(color=color)
+            ))
+
+        # Update layout
+        fig.update_layout(
+            barmode='group',
+            title=f'Average Sentiment Scores for {selected_headphone}',
+            xaxis=dict(title='Aspect'),
+            yaxis=dict(title='Average Score'),
+        )
+    else:
+        # If no headphone is selected, display an empty figure
+        fig.update_layout(title='Please select a headphone to display data.')
+
+    return fig
+
 
 
 if __name__ == '__main__':
