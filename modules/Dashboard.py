@@ -1,4 +1,5 @@
 import pandas as pd
+import seaborn as sns
 from sqlalchemy import create_engine, inspect
 import ast
 import dash
@@ -201,6 +202,8 @@ def update_chart(selected_headphone):
     
     return f'Brand Name: {brand_name}', f'Overall Rating: {star_rating}', f'Total Number of Reviews: {review_count}', fig, features_text
 
+from scipy.stats import gaussian_kde
+import numpy as np
 @app.callback(
     Output('sentiment-distribution', 'figure'),
     [Input('headphone-dropdown', 'value'),
@@ -217,17 +220,34 @@ def update_graph(selected_headphone, selected_aspect):
     elif selected_aspect == 'noisecancellation':
         filtered_df = noisecancellation_df[noisecancellation_df['headphoneName'] == selected_headphone]
 
-    fig = px.histogram(filtered_df, 
-                       x=f'{selected_aspect}Score', nbins=10,
-                       color=f'{selected_aspect}Label', 
-                       labels={f'{selected_aspect}Score': 'Sentiment Score'},
-                       opacity=0.7)
-    
-    fig.update_layout(title=f'Sentiment Distribution for {selected_headphone} ({selected_aspect.replace("_", " ").title()})',
-                      xaxis_title='Sentiment Score', 
-                      yaxis_title='Frequency',
-                      legend=dict(x=0, y=1, traceorder='normal', orientation='h')
-                     )
+    fig = go.Figure()
+
+    # Iterate through each sentiment label and add a kernel density line to the figure
+    for sentiment_label, color, marker_symbol in zip(['Positive', 'Negative'], ['blue', 'orange'], ['circle', 'cross']):
+        scatter_data = filtered_df[filtered_df[f'{selected_aspect}Label'] == sentiment_label]
+        
+        kde = gaussian_kde(scatter_data[f'{selected_aspect}Score'])
+        x_vals = np.linspace(scatter_data[f'{selected_aspect}Score'].min(), scatter_data[f'{selected_aspect}Score'].max() + 1, 300)
+        y_vals = kde(x_vals)
+
+        fig.add_trace(go.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode='lines',
+            name=sentiment_label,
+            line=dict(color=color, width=2),
+            fill='tozeroy',  # Fill area under the curve
+            opacity=0.7
+        ))
+
+    # Update layout
+    fig.update_layout(
+        title=f'Sentiment Distribution for {selected_headphone} ({selected_aspect.replace("_", " ").title()})',
+        xaxis_title='Sentiment Score',
+        yaxis_title='Density',
+        legend=dict(x=0, y=1, traceorder='normal', orientation='h')
+    )
+
     return fig
 
 @app.callback(
