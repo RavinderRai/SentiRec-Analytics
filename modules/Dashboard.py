@@ -1,5 +1,7 @@
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy.stats import gaussian_kde
 from sqlalchemy import create_engine, inspect
 import ast
 import dash
@@ -202,14 +204,24 @@ def update_chart(selected_headphone):
     
     return f'Brand Name: {brand_name}', f'Overall Rating: {star_rating}', f'Total Number of Reviews: {review_count}', fig, features_text
 
-from scipy.stats import gaussian_kde
-import numpy as np
+
 @app.callback(
     Output('sentiment-distribution', 'figure'),
     [Input('headphone-dropdown', 'value'),
-     Input('aspect-dropdown', 'value')]
+     Input('aspect-dropdown', 'value'),
+     Input('grouped-bar-chart', 'clickData'),
+     Input('grouped-bar-chart', 'hoverData')
+    ]
 )
-def update_graph(selected_headphone, selected_aspect):
+def update_graph(selected_headphone, selected_aspect, clickData, hoverData):
+    if clickData is not None:
+        # Extract the clicked bar information
+        selected_aspect = clickData['points'][0]['x']
+        #selected_sentiment = clickData['points'][0]['hovertext'].split(': ')[-1].lower()
+        print(f"Selected Aspect: {selected_aspect}")
+        print(hoverData['points'][0])
+        #print(f"Selected Sentiment: {selected_sentiment}")
+        
     #showing a distribution of the sentiments per aspect
     if selected_aspect == 'battery':
         filtered_df = battery_df[battery_df['headphoneName'] == selected_headphone]
@@ -281,7 +293,8 @@ def update_grouped_bar_chart(selected_headphone, relayout_data):
                 x=labels,
                 y=averages,
                 name=sentiment_label,
-                marker=dict(color=color)
+                marker=dict(color=color),
+                hovertemplate='%{x}: %{y}<br>Sentiment: ' + sentiment_label  # Add sentiment to hover template
             ))
 
         # Update layout
