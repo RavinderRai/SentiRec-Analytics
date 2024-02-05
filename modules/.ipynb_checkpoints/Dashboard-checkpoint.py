@@ -98,7 +98,7 @@ app.layout = dbc.Container([
     dbc.Row([
         #left column with review ratings analytics
         dbc.Col(
-            [html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '800px'}, children=[
+            [html.Div(style={'backgroundColor': custom_colors['background'], 'color': custom_colors['text'], 'width': '475px'}, children=[
 
             html.Div(id='brand-name'),
             html.Div(id='star-rating', className='star-rating'),
@@ -119,22 +119,22 @@ app.layout = dbc.Container([
         #right column with aspect based sentiment analysis analytics
         dbc.Col([
             html.H4('ABSA', style={'text-align': 'center'}),
+                        
+            #select positive or negative sentiments
+            dcc.RadioItems(
+                id='select-sentiment',
+                options=[
+                    {'label': 'Positive', 'value': 'Positive'},
+                    {'label': 'Negative', 'value': 'Negative'}
+                ],
+                value='Positive',
+                labelStyle={'display': 'block'}  # Display options vertically for a button-style appearance
+            ),
             
             dcc.Graph(id='grouped-bar-chart'),
             
-            dcc.Dropdown(
-                id='aspect-dropdown',
-                options=[
-                    {'label': 'Battery', 'value': 'battery'},
-                    {'label': 'Comfort', 'value': 'comfort'},
-                    {'label': 'Sound Quality', 'value': 'soundquality'},
-                    {'label': 'Noise Cancellation', 'value': 'noisecancellation'}
-                ],
-                value='battery',
-                multi=False,
-                placeholder='Select an Aspect'
-            ),
             dcc.Graph(id='sentiment-distribution')
+            
         ], width=4)
     ]),
     
@@ -193,14 +193,15 @@ def update_chart(selected_headphone):
         
         'layout': {
             'title': f'Ratings Distribution for {selected_headphone}',
-            'yaxis': {'tickvals': percentages, 'ticktext': [f'{val:.1f}%' for val in percentages]}
+            'yaxis': {'tickvals': percentages, 'ticktext': [f'{val:.1f}%' for val in percentages]},
+            'height': 450
         }
     }
     
     #description_text = selected_row['description']
     
     features_text = ast.literal_eval(selected_row['features'])
-    features_text = html.Div([dcc.Markdown(f'- {feature}') for feature in features_text])
+    features_text = html.Div([dcc.Markdown(f'- {feature}') for feature in features_text], style={'font-size': '12px'})
     
     return f'Brand Name: {brand_name}', f'Overall Rating: {star_rating}', f'Total Number of Reviews: {review_count}', fig, features_text
 
@@ -208,19 +209,17 @@ def update_chart(selected_headphone):
 @app.callback(
     Output('sentiment-distribution', 'figure'),
     [Input('headphone-dropdown', 'value'),
-     Input('aspect-dropdown', 'value'),
-     Input('grouped-bar-chart', 'clickData'),
-     Input('grouped-bar-chart', 'hoverData')
+     Input('select-sentiment', 'value'),
+     Input('grouped-bar-chart', 'clickData')
     ]
 )
-def update_graph(selected_headphone, selected_aspect, clickData, hoverData):
+def update_graph(selected_headphone, selected_sentiment, clickData):
+    #default aspect
+    selected_aspect = 'battery'
+    
     if clickData is not None:
         # Extract the clicked bar information
         selected_aspect = clickData['points'][0]['x']
-        #selected_sentiment = clickData['points'][0]['hovertext'].split(': ')[-1].lower()
-        print(f"Selected Aspect: {selected_aspect}")
-        print(hoverData['points'][0])
-        #print(f"Selected Sentiment: {selected_sentiment}")
         
     #showing a distribution of the sentiments per aspect
     if selected_aspect == 'battery':
@@ -230,27 +229,29 @@ def update_graph(selected_headphone, selected_aspect, clickData, hoverData):
     elif selected_aspect == 'soundquality':
         filtered_df = soundquality_df[soundquality_df['headphoneName'] == selected_headphone]
     elif selected_aspect == 'noisecancellation':
-        filtered_df = noisecancellation_df[noisecancellation_df['headphoneName'] == selected_headphone]
-
+        filtered_df = noisecancellation_df[noisecancellation_df['headphoneName'] == selected_headphone]  
+    
+    line_color = 'blue' if selected_sentiment == 'Positive' else '#D87093'
+    
     fig = go.Figure()
 
     # Iterate through each sentiment label and add a kernel density line to the figure
-    for sentiment_label, color, marker_symbol in zip(['Positive', 'Negative'], ['blue', 'orange'], ['circle', 'cross']):
-        scatter_data = filtered_df[filtered_df[f'{selected_aspect}Label'] == sentiment_label]
-        
-        kde = gaussian_kde(scatter_data[f'{selected_aspect}Score'])
-        x_vals = np.linspace(scatter_data[f'{selected_aspect}Score'].min(), scatter_data[f'{selected_aspect}Score'].max() + 1, 300)
-        y_vals = kde(x_vals)
+    #for sentiment_label, color, marker_symbol in zip(['Positive', 'Negative'], ['blue', 'orange'], ['circle', 'cross']):
+    scatter_data = filtered_df[filtered_df[f'{selected_aspect}Label'] == selected_sentiment]
 
-        fig.add_trace(go.Scatter(
-            x=x_vals,
-            y=y_vals,
-            mode='lines',
-            name=sentiment_label,
-            line=dict(color=color, width=2),
-            fill='tozeroy',  # Fill area under the curve
-            opacity=0.7
-        ))
+    kde = gaussian_kde(scatter_data[f'{selected_aspect}Score'])
+    x_vals = np.linspace(scatter_data[f'{selected_aspect}Score'].min(), scatter_data[f'{selected_aspect}Score'].max() + 1, 300)
+    y_vals = kde(x_vals)
+
+    fig.add_trace(go.Scatter(
+        x=x_vals,
+        y=y_vals,
+        mode='lines',
+        name=selected_sentiment,
+        line=dict(color=line_color, width=2),
+        fill='tozeroy',  # Fill area under the curve
+        opacity=0.7
+    ))
 
     # Update layout
     fig.update_layout(
@@ -265,42 +266,41 @@ def update_graph(selected_headphone, selected_aspect, clickData, hoverData):
 @app.callback(
     Output('grouped-bar-chart', 'figure'),
     [Input('headphone-dropdown', 'value'),
+     Input('select-sentiment', 'value'),
      Input('grouped-bar-chart', 'relayoutData')]
 )
-def update_grouped_bar_chart(selected_headphone, relayout_data):
+def update_grouped_bar_chart(selected_headphone, selected_sentiment, relayout_data):
     # Create a grouped bar chart using plotly.graph_objects.Figure
     fig = go.Figure()
-
+    
     # Check if a headphone is selected
     if selected_headphone:
-        # Iterate through each sentiment label and add bars to the figure
-        for sentiment_label, color in zip(['Positive', 'Negative'], ['blue', 'orange']):
-            averages = []
-            labels = []
+        averages = []
+        labels = []
 
-            # Iterate through each DataFrame and calculate the average score for the sentiment label
-            for df in [battery_df, comfort_df, noisecancellation_df, soundquality_df]:
-                filtered_df = df[df['headphoneName'] == selected_headphone]
+        # Iterate through each DataFrame and calculate the average score for the selected sentiment
+        for df in [battery_df, comfort_df, noisecancellation_df, soundquality_df]:
+            filtered_df = df[df['headphoneName'] == selected_headphone]
 
-                # Check if the filtered DataFrame is not empty
-                if not filtered_df.empty:
-                    aspect_name = filtered_df.columns[1].replace('Label', '')
-                    avg_score = filtered_df[filtered_df['{}Label'.format(aspect_name)] == sentiment_label]['{}Score'.format(aspect_name)].mean()
-                    averages.append(avg_score)
-                    labels.append(aspect_name)
+            # Check if the filtered DataFrame is not empty
+            if not filtered_df.empty:
+                aspect_name = filtered_df.columns[1].replace('Label', '')
+                avg_score = filtered_df[filtered_df['{}Label'.format(aspect_name)] == selected_sentiment]['{}Score'.format(aspect_name)].mean()
+                averages.append(avg_score)
+                labels.append(aspect_name)
 
-            fig.add_trace(go.Bar(
-                x=labels,
-                y=averages,
-                name=sentiment_label,
-                marker=dict(color=color),
-                hovertemplate='%{x}: %{y}<br>Sentiment: ' + sentiment_label  # Add sentiment to hover template
-            ))
+        fig.add_trace(go.Bar(
+            x=labels,
+            y=averages,
+            name=selected_sentiment,
+            marker=dict(color='blue' if selected_sentiment == 'Positive' else '#D87093'),
+            hovertemplate='%{x}: %{y}<br>Sentiment: ' + selected_sentiment  # Add sentiment to hover template
+        ))
 
         # Update layout
         fig.update_layout(
             barmode='group',
-            title=f'Average Sentiment Scores for {selected_headphone}',
+            title=f'Average {selected_sentiment} Sentiment Scores for {selected_headphone}',
             xaxis=dict(title='Aspect'),
             yaxis=dict(title='Average Score'),
         )
