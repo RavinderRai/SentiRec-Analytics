@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import requests
+from PIL import Image
+from io import BytesIO
 from scipy.stats import gaussian_kde
 from sqlalchemy import create_engine, inspect
 import ast
@@ -70,13 +73,18 @@ def clean_star_label(xstars):
         return xstars[0] + ' ' + xstars[1:]
     
 # Function to generate features text
+#def generate_features_text(features):
+#    features_text = ast.literal_eval(features)
+#    st.markdown('\n'.join([f'- {feature}' for feature in features_text]), unsafe_allow_html=True)
+    
 def generate_features_text(features):
     features_text = ast.literal_eval(features)
-    return st.markdown('\n'.join([f'- {feature}' for feature in features_text]), unsafe_allow_html=True)
+    return '\n'.join([f'- {feature}' for feature in features_text])
+
 
 def avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, comfort_df, noisecancellation_df, soundquality_df):
     # Create a grouped bar chart using plotly.graph_objects.Figure
-    fig = go.Figure()
+    fig = go.FigureWidget()
     
     # Check if a headphone is selected
     if selected_headphone:
@@ -94,6 +102,7 @@ def avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, com
                 averages.append(avg_score)
                 labels.append(aspect_name)
 
+        
         fig.add_trace(go.Bar(
             x=labels,
             y=averages,
@@ -101,13 +110,18 @@ def avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, com
             marker=dict(color='blue' if selected_sentiment == 'Positive' else '#D87093'),
             hovertemplate='%{x}: %{y}<br>Sentiment: ' + selected_sentiment  # Add sentiment to hover template
         ))
+        
 
         # Update layout
         fig.update_layout(
             barmode='group',
-            title=f'Average {selected_sentiment} Sentiment Scores for {selected_headphone}',
+            title=f'Average {selected_sentiment} Rating for {selected_headphone}',
             xaxis=dict(title='Aspect'),
             yaxis=dict(title='Average Score'),
+            height=400,
+            width=400,
+            plot_bgcolor='black',
+            paper_bgcolor='black'
         )
     else:
         # If no headphone is selected, display an empty figure
@@ -121,7 +135,8 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
 
     if click_data is not None:
         # Extract the clicked bar information
-        selected_aspect = click_data['points'][0]['x']
+        selected_aspect = click_data
+        
 
     # Showing a distribution of the sentiments per aspect
     if selected_aspect == 'battery':
@@ -159,6 +174,8 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
         title=f'Sentiment Distribution for {selected_headphone} ({selected_aspect.replace("_", " ").title()})',
         xaxis_title='Sentiment Score',
         yaxis_title='Density',
+        height=400,
+        width=400,
         legend=dict(x=0, y=1, traceorder='normal', orientation='h')
     )
 
@@ -168,17 +185,35 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
 def main():
     selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
     
+    selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
+    
+    
+    #with st.sidebar.expander("Features"):
+    #    generate_features_text(selected_row['features'])
+    
     overall_col, display_col, absa_col = st.columns(3)
     
     with overall_col:
-    
-        selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
-        brand_name = selected_row['brand']
+        #brand_name = selected_row['brand']
+        #st.write(f'Brand Name: {brand_name}')
+        
         star_rating = selected_row['stars']
+        
+        # Generate star graphics using Unicode characters
+        rating = int(round(star_rating))
+        stars = '★' * rating + '☆' * (5 - rating)
+        styled_stars = f'<div style="font-size: 3em; text-align: center; margin-top: -0.5em;">{stars}</div>'
+        centered_content = f"""
+        <div style="text-align: center; margin-bottom: 0.5em;">
+            <h3 style="margin-bottom: 0;">Overall Rating:</h3>
+            {styled_stars}
+        </div>
+        """
+        st.markdown(centered_content, unsafe_allow_html=True)
+        
         review_count = selected_row['reviewsCount']
-        st.write(f'Brand Name: {brand_name}')
-        st.write(f'Overall Rating: {star_rating}')
-        st.write(f'Total Number of Reviews: {review_count}')
+        styled_text = f'<div style="font-size: 20px; padding: 10px; border: 1px solid #007bff; border-radius: 5px; text-align: center;">Number of Reviews:<br/><span style="font-size: 40px;">{review_count}</span></div>'
+        st.write(styled_text, unsafe_allow_html=True)
         
         stars_labels = [clean_star_label(stars) for stars in list(selected_row['starsBreakdown'].keys())]
         values = list(selected_row['starsBreakdown'].values())
@@ -187,35 +222,55 @@ def main():
 
         # Create bar chart
         fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages)])
-        fig.update_layout(title=f'Ratings Distribution for {selected_headphone}', yaxis_title='Percentage')
+        fig.update_layout(
+            title=f'Ratings Distribution for {selected_headphone}', 
+            yaxis_title='Percentage',
+            height=400,
+            width=400
+        )
         st.plotly_chart(fig)
         
-        st.subheader("Features:")
-        generate_features_text(selected_row['features'])
         
-    with display_col:
-        st.write('Amazon picture and link')
+    with display_col:        
+        urls = ast.literal_eval(selected_row['highResolutionImages'])
+        
+        response = requests.get(urls[0])
+        
+        if response.status_code == 200:
+            # Open the image using PIL (Python Imaging Library)
+            image = Image.open(BytesIO(response.content))
+
+            # Display the image in Streamlit
+            st.image(image, caption='Image Caption', use_column_width=True)
+        else:
+            st.error('Failed to fetch the image. Please check the URL.')
+            
+        st.text_area("Features:", generate_features_text(selected_row['features']), height=400)
+
         
     with absa_col:
         # Display grouped bar chart for aspect-based sentiment analysis
-        st.subheader('ABSA')
-        selected_sentiment = st.radio('Select Sentiment', ['Positive', 'Negative'])
-        absa_chart = avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, comfort_df, noisecancellation_df, soundquality_df)
-        #st.plotly_chart(absa_chart)
+        #selected_sentiment = st.radio('Select Sentiment', ['Positive', 'Negative'])
+        check_sentiment = st.checkbox('Positive or Negative Sentiments', value=True)
+        if check_sentiment:
+            selected_sentiment = 'Positive'
+        else:
+            selected_sentiment = 'Negative'
+        absa_chart = avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, comfort_df, noisecancellation_df, soundquality_df)        
         
         event = plotly_events(absa_chart, 'click')
         
-        #click_data = st.session_state.get('click_data', None)
-        st.write(event)
-        
-        if event is not None:
+        if event:
             clicked_label = event[0]['x']
-            st.write(f"Clicked Label: {clicked_label}")
+        else:
+            clicked_label = 'battery'
         
         # Display sentiment distribution
         st.subheader('Sentiment Distribution')
-        st.write('Sentiment distribution goes here...')
+        absa_distribution = sentiment_distribution(selected_headphone, selected_sentiment, clicked_label)
+        st.plotly_chart(absa_distribution)
     
+
 if __name__ == "__main__":
     st.markdown(
         """
@@ -228,5 +283,8 @@ if __name__ == "__main__":
         """,
         unsafe_allow_html=True
     )
-    st.markdown("<h1 style='text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
+    #st.markdown("<h1 style='text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='margin-top: 0; text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
+
     main()
+    
