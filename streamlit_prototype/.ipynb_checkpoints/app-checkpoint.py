@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import os
 import requests
 from PIL import Image
 from io import BytesIO
@@ -181,11 +182,28 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
 
     return fig
 
+# Function to get the image filename based on the selected headphone
+def get_image_filename(headphone_name, image_dir = "translucent_images"):
+    return os.path.join(image_dir, f"{headphone_name}.png")
 
-def main():
-    selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
-    
-    selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
+#for plots so they change size when toggling side bar
+plot_style = """
+    <style>
+        .stPlot {
+            transition: all 0.3s ease-in-out;
+        }
+        .sidebar-closed .stPlot {
+            width: 100%; /* Set the plot width to 100% when the sidebar is closed */
+        }
+        .sidebar-open .stPlot {
+            width: 80%; /* Set the plot width to 80% when the sidebar is open */
+        }
+    </style>
+"""
+
+
+def main(selected_headphone, selected_row):
+    #selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
     
     
     #with st.sidebar.expander("Features"):
@@ -197,6 +215,34 @@ def main():
         #brand_name = selected_row['brand']
         #st.write(f'Brand Name: {brand_name}')
         
+        
+        review_count = int(selected_row['reviewsCount'])
+        styled_text = f'<div style="font-size: 20px; padding: 10px; border: 1px solid #007bff; border-radius: 5px; text-align: center;">Number of Reviews:<br/><span style="font-size: 40px;">{review_count}</span></div>'
+        st.write(styled_text, unsafe_allow_html=True)
+        
+        stars_labels = [clean_star_label(stars) for stars in list(selected_row['starsBreakdown'].keys())]
+        values = list(selected_row['starsBreakdown'].values())
+        total = sum(values)
+        percentages = [(value / total) * 100 for value in values]
+
+        # Create bar chart
+        fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages)])
+        fig.update_layout(
+            title=f'Ratings Distribution for {selected_headphone}', 
+            yaxis_title='Percentage',
+            #height=300,
+            #width=300
+        )
+
+        # Display the CSS style
+        st.markdown(plot_style, unsafe_allow_html=True)
+        st.plotly_chart(fig, use_container_width=True, className="stPlot")
+        #st.plotly_chart(fig)
+        
+        
+       
+        
+    with display_col:
         star_rating = selected_row['stars']
         
         # Generate star graphics using Unicode characters
@@ -211,56 +257,68 @@ def main():
         """
         st.markdown(centered_content, unsafe_allow_html=True)
         
-        review_count = selected_row['reviewsCount']
-        styled_text = f'<div style="font-size: 20px; padding: 10px; border: 1px solid #007bff; border-radius: 5px; text-align: center;">Number of Reviews:<br/><span style="font-size: 40px;">{review_count}</span></div>'
-        st.write(styled_text, unsafe_allow_html=True)
+        image_filename = get_image_filename(selected_headphone)
         
-        stars_labels = [clean_star_label(stars) for stars in list(selected_row['starsBreakdown'].keys())]
-        values = list(selected_row['starsBreakdown'].values())
-        total = sum(values)
-        percentages = [(value / total) * 100 for value in values]
-
-        # Create bar chart
-        fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages)])
-        fig.update_layout(
-            title=f'Ratings Distribution for {selected_headphone}', 
-            yaxis_title='Percentage',
-            height=400,
-            width=400
-        )
-        st.plotly_chart(fig)
-        
-        
-    with display_col:        
-        urls = ast.literal_eval(selected_row['highResolutionImages'])
-        
-        response = requests.get(urls[0])
-        
-        if response.status_code == 200:
-            # Open the image using PIL (Python Imaging Library)
-            image = Image.open(BytesIO(response.content))
-
-            # Display the image in Streamlit
-            st.image(image, caption='Image Caption', use_column_width=True)
+        if os.path.exists(image_filename):
+            st.image(image_filename, caption=None)
         else:
-            st.error('Failed to fetch the image. Please check the URL.')
-            
-        st.text_area("Features:", generate_features_text(selected_row['features']), height=400)
+            st.write("Image not found.")
 
         
     with absa_col:
         # Display grouped bar chart for aspect-based sentiment analysis
         #selected_sentiment = st.radio('Select Sentiment', ['Positive', 'Negative'])
-        st.write('<div style="text-align: center;">', unsafe_allow_html=True)
-        check_sentiment = st.checkbox('Positive or Negative Sentiments', value=True)
-        st.write('</div>', unsafe_allow_html=True)
-        #check_sentiment = st.checkbox('Positive or Negative Sentiments', value=True)
+        check_sentiment = st.checkbox('Toggle Positive or Negative Sentiment', value=True)
         if check_sentiment:
             selected_sentiment = 'Positive'
         else:
             selected_sentiment = 'Negative'
+            
+        if selected_headphone:
+            averages = []
+            labels = []
+
+            # Iterate through each DataFrame and calculate the average score for the selected sentiment
+            for df in [battery_df, comfort_df, noisecancellation_df, soundquality_df]:
+                filtered_df = df[df['headphoneName'] == selected_headphone]
+
+                # Check if the filtered DataFrame is not empty
+                if not filtered_df.empty:
+                    aspect_name = filtered_df.columns[1].replace('Label', '')
+                    avg_score = filtered_df[filtered_df['{}Label'.format(aspect_name)] == selected_sentiment]['{}Score'.format(aspect_name)].mean()
+                    averages.append(avg_score)
+                    labels.append(aspect_name)
+                    
+            sentiment_ratings_out_of_five = [(sentiment_rating * 5) for sentiment_rating in averages]
+            sentiment_ratings_out_of_five = [int(round(sentiment_rating)) for sentiment_rating in sentiment_ratings_out_of_five]
+            sentiment_ratings_out_of_five = ['★' * sentiment_rating + '☆' * (5 - sentiment_rating) for sentiment_rating in sentiment_ratings_out_of_five]
+            
+            col1, col2, col3, col4 = st.columns(4)
+
+            # Define a function to handle the selection
+            def select_option(sentiment_ratings_out_of_five):
+                # Print the selected option
+                st.write(f"You selected: {sentiment_ratings_out_of_five}")
+
+            # Create custom radio buttons using stars
+            if col1.button(sentiment_ratings_out_of_five[0], key = labels[0]):
+                select_option(sentiment_ratings_out_of_five[0])
+            if col2.button(sentiment_ratings_out_of_five[1], key = labels[1]):
+                select_option(sentiment_ratings_out_of_five[1])
+            if col3.button(sentiment_ratings_out_of_five[2], key = labels[2]):
+                select_option(sentiment_ratings_out_of_five[2])
+            if col4.button(sentiment_ratings_out_of_five[3], key = labels[3]):
+                select_option(sentiment_ratings_out_of_five[3])
+
+            
+            
+            st.write(labels)
+            st.write(sentiment_ratings_out_of_five)
+                
+            
         absa_chart = avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, comfort_df, noisecancellation_df, soundquality_df)        
         
+        st.markdown(plot_style, unsafe_allow_html=True)
         event = plotly_events(absa_chart, 'click')
         
         if event:
@@ -271,15 +329,17 @@ def main():
         # Display sentiment distribution
         st.subheader('Sentiment Distribution')
         absa_distribution = sentiment_distribution(selected_headphone, selected_sentiment, clicked_label)
-        st.plotly_chart(absa_distribution)
+        st.markdown(plot_style, unsafe_allow_html=True)
+        st.plotly_chart(absa_distribution, use_container_width=True, className="stPlot")
+        #st.plotly_chart(absa_distribution)
     
-
+import altair as alt
 if __name__ == "__main__":
     st.markdown(
         """
         <style>
         .stApp {
-            background-image: url('https://img.freepik.com/free-photo/vivid-blurred-colorful-wallpaper-background_58702-3764.jpg');
+            background-image: url('https://t4.ftcdn.net/jpg/05/64/29/91/360_F_564299133_Y4DkEzEcleJlHFCjySytI5cEumezC7PB.jpg');
             background-size: cover;
         }
         </style>
@@ -287,7 +347,48 @@ if __name__ == "__main__":
         unsafe_allow_html=True
     )
     #st.markdown("<h1 style='text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
-    st.markdown("<h1 style='margin-top: 0; text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
+    #st.markdown("<h1 style='margin-top: 0; text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
+    #selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
+    with st.sidebar:
+        selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
+        selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
+        st.markdown("<h1 style='color: gray;'>Sidebar Title</h1>", unsafe_allow_html=True)
+        st.markdown("<h3>This is the sidebar content.</h3>", unsafe_allow_html=True)
 
-    main()
+        st.text_area("Features:", generate_features_text(selected_row['features']), height=400)
+    
+    #selected_headphone = st.sidebar.selectbox('SentiRec Analytics: Select Headphone', prod_descriptions['headphoneName'])
+    df = pd.DataFrame({
+        'x': np.random.rand(100),
+        'y': np.random.rand(100)
+    })
+
+    # Create a plot
+    fig = go.Figure(data=go.Scatter(x=df['x'], y=df['y'], mode='markers'))
+    
+
+
+    # Use st.markdown to customize the appearance of the radio buttons
+    options = ['★', '★★', '★★★', '★★★★', '★★★★★']
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    # Define a function to handle the selection
+    def select_option(option):
+        # Print the selected option
+        st.write(f"You selected: {option}")
+
+    # Create custom radio buttons using stars
+    if col1.button(options[0]):
+        select_option(options[0])
+    if col2.button(options[1]):
+        select_option(options[1])
+    if col3.button(options[2]):
+        select_option(options[2])
+    if col4.button(options[3]):
+        select_option(options[3])
+    if col5.button(options[4]):
+        select_option(options[4])
+    
+    
+    main(selected_headphone, selected_row)
     
