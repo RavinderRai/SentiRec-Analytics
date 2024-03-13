@@ -2,16 +2,22 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import os
+import re
 import requests
 from PIL import Image
 from io import BytesIO
 from scipy.stats import gaussian_kde
 from sqlalchemy import create_engine, inspect
-import ast
+from ast import literal_eval
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 from streamlit_plotly_events import plotly_events
+from sklearn.metrics.pairwise import cosine_similarity
+from Get_Recommendations import HeadphoneRecommendations
+
+st.set_page_config(page_title="SentiRec Analytics", layout="wide")
+
 
 
 
@@ -51,6 +57,7 @@ finally:
 
 headphones_fact_table = dataframes_dict['headphones_fact_table']
 prod_descriptions = dataframes_dict['amazon_product_descriptions']
+yt_df = dataframes_dict['yt_reviews_gen_summaries']
 
 #getting df's for each aspect and leaving out rows with 0 scores
 battery_df = headphones_fact_table[['headphoneName', 'batteryLabel', 'batteryScore']].loc[headphones_fact_table['batteryScore'] != 0]
@@ -65,7 +72,11 @@ assert (soundquality_df['soundqualityScore'] == 0).sum() == 0, "There are zero v
 
 #Airpods 3 doesn't have values in this df
 prod_descriptions = prod_descriptions.drop(prod_descriptions[prod_descriptions['headphoneName'] == 'AirPods 3'].index)
-prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(ast.literal_eval)
+prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(literal_eval)
+
+reviews_df = dataframes_dict['averaged_embeddings']
+reviews_df = reviews_df.drop(reviews_df[reviews_df['headphoneName'] == 'AirPods 3'].index)
+reviews_df['ProductEmbedding'] = reviews_df['ProductEmbedding'].apply(literal_eval)
 
 def clean_star_label(xstars):
     if xstars[0] != '1':
@@ -74,13 +85,9 @@ def clean_star_label(xstars):
         return xstars[0] + ' ' + xstars[1:]
     
 # Function to generate features text
-#def generate_features_text(features):
-#    features_text = ast.literal_eval(features)
-#    st.markdown('\n'.join([f'- {feature}' for feature in features_text]), unsafe_allow_html=True)
-    
 def generate_features_text(features):
-    features_text = ast.literal_eval(features)
-    return '\n'.join([f'- {feature}' for feature in features_text])
+    features_text = literal_eval(features)
+    return '\n\n'.join([f'- {feature}' for feature in features_text])
 
 
 def avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, comfort_df, noisecancellation_df, soundquality_df):
@@ -173,20 +180,32 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
             opacity=0.7
         ))
 
+    proper_name_dct = {'battery': 'Battery',
+                       'comfort': 'Comfort',
+                       'soundquality': 'Sound Quality',
+                       'noisecancellation': 'Noise Cancellation',}
+    
+    custom_ticks = [0.2, 0.6, 1]
+    custom_tick_labels = ['1', '3', '5']
+
     # Update layout
     fig.update_layout(
         title=dict(
-            text="Ratings Distribution",
-            x=0.28,  # Center horizontally
+            text="Feature Ratings Distribution<br>               (select above)",
+            x=0.16,  # Center horizontally
         ),
-        xaxis_title='Sentiment Score',
+        #xaxis_title='Sentiment Score',
         #yaxis_title='Density',
         height=350,
         #width=400,
         plot_bgcolor='rgba(0, 0, 255, 0.1)',
         paper_bgcolor='rgba(0, 0, 255, 0.0)',
         legend=dict(x=0, y=1, traceorder='normal', orientation='h'),
-        xaxis=dict(showgrid=False),
+        xaxis=dict(
+            tickvals=custom_ticks,
+            ticktext=custom_tick_labels,
+            tickmode='array',
+        ),
         yaxis=dict(showgrid=False, showticklabels=False),
     )
 
@@ -220,7 +239,12 @@ plot_style = """
         }
     </style>
 """
-
+def get_yt_summaries(df, row):
+    youtuber = df['channel_name'].iloc[row]
+    vid_link = df['video_link'].iloc[row]
+    summary = df['generated_summaries'].iloc[row]
+    cleaned_summary = re.sub(r'\s*\.\s*', '. ', summary)
+    return youtuber, vid_link, cleaned_summary
 
 
 def main(selected_headphone, selected_row):
@@ -232,13 +256,10 @@ def main(selected_headphone, selected_row):
     
     overall_col, display_col, absa_col = st.columns(3)
     
-    with overall_col:
-        #brand_name = selected_row['brand']
-        #st.write(f'Brand Name: {brand_name}')
-        
+    with overall_col:        
         #padding/white space
         st.write(' ')
-        
+        st.write(' ')   
         
         review_count = int(selected_row['reviewsCount'])
         styled_text = f'<div style="font-size: 20px; padding: 10px; border: 0px solid #007bff; border-radius: 5px; text-align: center;">Number of Reviews:<br/><span style="font-size: 40px;">{review_count}</span></div>'
@@ -251,18 +272,18 @@ def main(selected_headphone, selected_row):
 
         
         # Create bar chart
-        fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages, marker_color='#22F2FF')])
+        fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages, marker_color='#9ADDFF', marker=dict(opacity=0.7))])
         fig.update_layout(
             title=dict(
                 text="Ratings Distribution",
                 x=0.3,  # Center horizontally
             ),
-            plot_bgcolor='rgba(0, 0, 255, 0.1)',
+            plot_bgcolor='rgba(20, 170, 255, 0.1)',
             paper_bgcolor='rgba(0, 0, 255, 0.0)',
             xaxis=dict(showgrid=False),
             yaxis=dict(showgrid=False, showticklabels=False),
             #yaxis_title='Percentage',
-            #height=400,
+            height=520,
             #width=300
         )
 
@@ -275,8 +296,7 @@ def main(selected_headphone, selected_row):
        
         
     with display_col:
-        star_rating = selected_row['stars']
-        
+        star_rating = selected_row['stars']        
         # Generate star graphics using Unicode characters
         rating = int(round(star_rating))
         stars = '★' * rating + '☆' * (5 - rating)
@@ -288,12 +308,20 @@ def main(selected_headphone, selected_row):
         </div>
         """
         st.markdown(centered_content, unsafe_allow_html=True)
-        
-        #adding some padding/white space
-        st.write(' ')
+
+        brand_name = selected_row['brand']
+        centered_content_brand_name = f"""
+        <div style="text-align: center; margin-bottom: 0.5em;">
+            <h4 style="margin-bottom: 0; font-size: 24px;">Brand Name:</h4>
+            <span style="font-size: 22px;">{brand_name}</span>
+        </div>
+        """
+        st.markdown(centered_content_brand_name, unsafe_allow_html=True)
+
         
         #displaying image of earbuds
         image_filename = get_image_filename(selected_headphone)
+        
         
         if os.path.exists(image_filename):
             columns = st.columns((0.5, 12, 0.5))
@@ -301,13 +329,20 @@ def main(selected_headphone, selected_row):
         else:
             st.write("Image not found.")
             
-        #st.markdown("<h1 style='text-align: center; font-size: 24px;'>Amazon Link:</h1>", unsafe_allow_html=True)
+        st.write('')
+        st.write('')
         amazon_link = selected_row['url']
         st.markdown(f"""<h1 style='text-align: center; font-size: 24px;'><a href="{amazon_link}" target="_blank">Amazon Link</a></h1>""", unsafe_allow_html=True)
 
 
         
     with absa_col:
+        #white space
+        st.write('')
+
+        #this centers and fixes everything, including elements in the other columns, to stay centered
+        st.markdown("<style>div[data-testid='stHorizontalBlock']>div{display: flex; justify-content: center;}</style>", unsafe_allow_html=True)
+        
         styled_text_absa = f'<div style="font-size: 20px; padding: 10px; border: 0px solid #007bff; border-radius: 5px; text-align: center;">Feature Scores<br/></div>'
         st.write(styled_text_absa, unsafe_allow_html=True)
         
@@ -344,16 +379,33 @@ def main(selected_headphone, selected_row):
             aspects = ['Battery', 'Comfort', 'Noise Cancellation', 'Sound Quality']
             
             
-            # Create custom radio buttons using stars
-            for label, option, aspect_name in zip(labels, sentiment_ratings_out_of_five, aspects):
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    st.write(aspect_name)
-                with col2:
-                    if st.button(option, key=label):
-                        aspect = label
+            num_columns = 2
 
+            # Calculate the number of rows
+            num_rows = len(labels)
+            num_full_sets = num_rows // num_columns
+            num_rows_last_set = num_rows % num_columns
 
+            # Create columns
+            columns = st.columns(num_columns)
+
+            # Iterate through rows
+            for i in range(num_full_sets):
+                for j in range(num_columns):
+                    index = i * num_columns + j
+                    with columns[j]:
+                        st.write(aspects[index])
+                        if st.button(sentiment_ratings_out_of_five[index], key=labels[index]):
+                            aspect = labels[index]
+
+            # Deal with the last set of rows (if not a multiple of num_columns)
+            if num_rows_last_set != 0:
+                for i in range(num_rows_last_set):
+                    index = num_full_sets * num_columns + i
+                    with columns[i]:
+                        st.write(aspects[index])
+                        if st.button(sentiment_ratings_out_of_five[index], key=labels[index]):
+                            aspect = labels[index]
         
         # Display sentiment distribution
         absa_distribution = sentiment_distribution(selected_headphone, selected_sentiment, aspect)
@@ -361,14 +413,13 @@ def main(selected_headphone, selected_row):
         st.plotly_chart(absa_distribution, use_container_width=True, className="stPlot")
         #st.plotly_chart(absa_distribution)
 
-st.set_page_config(layout="wide")
 
 if __name__ == "__main__":
     st.markdown(
         """
         <style>
         .stApp {
-            background-image: url('https://t4.ftcdn.net/jpg/05/64/29/91/360_F_564299133_Y4DkEzEcleJlHFCjySytI5cEumezC7PB.jpg');
+            background-image: url('https://w.forfun.com/fetch/09/09fd60caa86f9743e9ebdc98c944a335.jpeg');
             background-size: cover;
         }
         </style>
@@ -378,16 +429,75 @@ if __name__ == "__main__":
     #st.markdown("<h1 style='text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
     #st.markdown("<h1 style='margin-top: 0; text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
     #selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
+
+    recommendations = HeadphoneRecommendations(model_file='../modules/glove_model.gensim', reviews_df=reviews_df)
+
     
     with st.sidebar:
-        selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
-        selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
-        
-        #st.markdown("<h1 style='color: gray;'>Features</h1>", unsafe_allow_html=True)
+        st.write(f"<span style='font-size: 24px;'>Select a Headphone:</span>", unsafe_allow_html=True)
+        selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'], label_visibility='collapsed')
+        selected_headphone_old = selected_headphone
+        selected_headphone_old2 = None
 
-        st.text_area("Highlight Features:", generate_features_text(selected_row['features']), height=400)
+        st.write(f"<span style='font-size: 20px;'>Or let us recommend one to you!</span>", unsafe_allow_html=True)
+        user_input = st.text_area("Describe your dream headphones here:")
+        if user_input:
+            top_recommendations = recommendations.get_recommendation(user_input)
+            selected_headphone = top_recommendations[0]
+            selected_headphone_old2 = selected_headphone
+        if selected_headphone_old2:
+            if selected_headphone != selected_headphone_old and selected_headphone != selected_headphone_old2:
+                user_input = st.text_area('')
+
+
+        st.write('We recommend the ', selected_headphone)
+        
+        st.write(f"<span style='font-size: 20px;'>Highlight Features:</span>", unsafe_allow_html=True)
+
+        selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
+        st.text_area("Highlight Features:", generate_features_text(selected_row['features']), height=400,label_visibility='collapsed')
     
     #selected_headphone = st.sidebar.selectbox('SentiRec Analytics: Select Headphone', prod_descriptions['headphoneName'])   
+
     
     main(selected_headphone, selected_row)
+
+    filtered_yt_df = yt_df[yt_df['headphoneName'] == selected_headphone]
+
+    filtered_yt_df = pd.DataFrame(filtered_yt_df)
+
+
+    
+    with st.expander('See what YouTubers are saying...'):
+        num_columns = 3
+
+        # Calculate the number of rows
+        num_rows = len(filtered_yt_df)
+        num_full_sets = num_rows // num_columns
+        num_rows_last_set = num_rows % num_columns
+
+        # Create columns
+        columns = st.columns(num_columns)
+
+        # Iterate through rows
+        for i in range(num_full_sets):
+            for j in range(num_columns):
+                row = i * num_columns + j
+                youtuber, vid_link, summary = get_yt_summaries(filtered_yt_df, row)
+                with columns[j]:
+                    st.write(f"<span style='font-size: 20px;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'>Video Link:</span><br>{vid_link}", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'>Summary:</span>", unsafe_allow_html=True)
+                    st.text_area('Summary:', summary, height=350, label_visibility='collapsed')
+
+        # Deal with the last set of rows (if not a multiple of num_columns)
+        if num_rows_last_set != 0:
+            for i in range(num_rows_last_set):
+                row = num_full_sets * num_columns + i
+                youtuber, vid_link, summary = get_yt_summaries(filtered_yt_df, row)
+                with columns[i]:
+                    st.write(f"<span style='font-size: 20px;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'>Video Link:</span><br>{vid_link}", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'>Summary:</span>", unsafe_allow_html=True)
+                    st.text_area('Summary:', summary, height=350, label_visibility='collapsed')
     
