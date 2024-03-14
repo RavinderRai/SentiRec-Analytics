@@ -156,7 +156,7 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
     elif selected_aspect == 'noisecancellation':
         filtered_df = noisecancellation_df[noisecancellation_df['headphoneName'] == selected_headphone]
 
-    line_color = '#22F2FF' if selected_sentiment == 'Positive' else '#D87093'
+    line_color = '#22F2FF' if selected_sentiment == 'Positive' else '#FF6161'
 
     fig = go.Figure()
 
@@ -196,9 +196,9 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
         ),
         #xaxis_title='Sentiment Score',
         #yaxis_title='Density',
-        height=350,
+        height=385,
         #width=400,
-        plot_bgcolor='rgba(0, 0, 255, 0.1)',
+        plot_bgcolor='rgba(20, 170, 255, 0.1)',
         paper_bgcolor='rgba(0, 0, 255, 0.0)',
         legend=dict(x=0, y=1, traceorder='normal', orientation='h'),
         xaxis=dict(
@@ -272,7 +272,7 @@ def main(selected_headphone, selected_row):
 
         
         # Create bar chart
-        fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages, marker_color='#9ADDFF', marker=dict(opacity=0.7))])
+        fig = go.Figure(data=[go.Bar(x=stars_labels, y=percentages, marker_color='#22F2FF', marker=dict(opacity=0.7))])
         fig.update_layout(
             title=dict(
                 text="Ratings Distribution",
@@ -394,7 +394,8 @@ def main(selected_headphone, selected_row):
                 for j in range(num_columns):
                     index = i * num_columns + j
                     with columns[j]:
-                        st.write(aspects[index])
+                        #st.write(aspects[index])
+                        st.write(f'<div style="font-size: 16px;">{aspects[index]}</div>', unsafe_allow_html=True)
                         if st.button(sentiment_ratings_out_of_five[index], key=labels[index]):
                             aspect = labels[index]
 
@@ -403,7 +404,8 @@ def main(selected_headphone, selected_row):
                 for i in range(num_rows_last_set):
                     index = num_full_sets * num_columns + i
                     with columns[i]:
-                        st.write(aspects[index])
+                        #st.write(aspects[index])
+                        st.write(f'<div style="font-size: 16px;">{aspects[index]}</div>', unsafe_allow_html=True)
                         if st.button(sentiment_ratings_out_of_five[index], key=labels[index]):
                             aspect = labels[index]
         
@@ -434,31 +436,47 @@ if __name__ == "__main__":
 
     
     with st.sidebar:
-        st.write(f"<span style='font-size: 24px;'>Select a Headphone:</span>", unsafe_allow_html=True)
-        selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'], label_visibility='collapsed')
-        selected_headphone_old = selected_headphone
-        selected_headphone_old2 = None
+        st.write(f"<span style='font-size: 24px;'>SentiRec Analytics:</span>", unsafe_allow_html=True)
+        st.write(f"<span style='font-size: 20px;'>Choose a headphone or let us recommend one:</span>", unsafe_allow_html=True)
 
-        st.write(f"<span style='font-size: 20px;'>Or let us recommend one to you!</span>", unsafe_allow_html=True)
-        user_input = st.text_area("Describe your dream headphones here:")
+        headphone_selector = st.checkbox('Toggle Dropdown or Recommendation Selection', value=True)
+
+
+        selected_headphone_dropdown = st.selectbox('Select from collection', 
+                                                       prod_descriptions['headphoneName'])
+        if headphone_selector:
+            st.write('You selected the ', selected_headphone_dropdown)
+        else:
+            st.write('')
+            st.write('')
+
+
+        # Display the text area for user input
+        user_input = st.text_input("Describe your dream headphones here:", value='really good battery life and bass')
+        if user_input == '':
+            raise ValueError('Please enter a description.')
+
+        # Perform recommendation if user input is provided
         if user_input:
             top_recommendations = recommendations.get_recommendation(user_input)
-            selected_headphone = top_recommendations[0]
-            selected_headphone_old2 = selected_headphone
-        if selected_headphone_old2:
-            if selected_headphone != selected_headphone_old and selected_headphone != selected_headphone_old2:
-                user_input = st.text_area('')
+            selected_headphone_rec = top_recommendations[0]
 
+        if headphone_selector:
+            st.write('')
+            st.write('')
+        else:
+            st.write('We recommend the ', selected_headphone_rec)
 
-        st.write('We recommend the ', selected_headphone)
-        
+        if headphone_selector:
+            selected_headphone = selected_headphone_dropdown
+        else:
+            selected_headphone = selected_headphone_rec
+
+        st.write('')
         st.write(f"<span style='font-size: 20px;'>Highlight Features:</span>", unsafe_allow_html=True)
 
         selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
-        st.text_area("Highlight Features:", generate_features_text(selected_row['features']), height=400,label_visibility='collapsed')
-    
-    #selected_headphone = st.sidebar.selectbox('SentiRec Analytics: Select Headphone', prod_descriptions['headphoneName'])   
-
+        st.text_area("Highlight Features:", generate_features_text(selected_row['features']), height=500,label_visibility='collapsed')
     
     main(selected_headphone, selected_row)
 
@@ -486,8 +504,8 @@ if __name__ == "__main__":
                 youtuber, vid_link, summary = get_yt_summaries(filtered_yt_df, row)
                 with columns[j]:
                     st.write(f"<span style='font-size: 20px;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
-                    st.write(f"<span style='font-size: 20px;'>Video Link:</span><br>{vid_link}", unsafe_allow_html=True)
-                    st.write(f"<span style='font-size: 20px;'>Summary:</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'><a href='{vid_link}' target='_blank'>Youtuber's Video Review Direct Link</a></span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'>Video Review Summary:</span>", unsafe_allow_html=True)
                     st.text_area('Summary:', summary, height=350, label_visibility='collapsed')
 
         # Deal with the last set of rows (if not a multiple of num_columns)
@@ -497,7 +515,7 @@ if __name__ == "__main__":
                 youtuber, vid_link, summary = get_yt_summaries(filtered_yt_df, row)
                 with columns[i]:
                     st.write(f"<span style='font-size: 20px;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
-                    st.write(f"<span style='font-size: 20px;'>Video Link:</span><br>{vid_link}", unsafe_allow_html=True)
-                    st.write(f"<span style='font-size: 20px;'>Summary:</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'><a href='{vid_link}' target='_blank'>Youtuber's Video Review Direct Link</a></span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px;'>Video Review Summary:</span>", unsafe_allow_html=True)
                     st.text_area('Summary:', summary, height=350, label_visibility='collapsed')
     
