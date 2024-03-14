@@ -52,10 +52,6 @@ reviews_df = reviews_df.drop(reviews_df[reviews_df['headphoneName'] == 'AirPods 
 reviews_df['ProductEmbedding'] = reviews_df['ProductEmbedding'].apply(literal_eval)
 
 
-
-
-
-
 def clean_star_label(xstars):
     if xstars[0] != '1':
         return xstars[0] + ' ' + xstars[1:] + 's'
@@ -363,51 +359,19 @@ if __name__ == "__main__":
     #st.markdown("<h1 style='margin-top: 0; text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
     #selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
 
-    recommendations = HeadphoneRecommendations(model_file='glove_model.gensim', reviews_df=reviews_df)
-
     
     with st.sidebar:
-        st.write(f"<span style='font-size: 24px;'>SentiRec Analytics:</span>", unsafe_allow_html=True)
-        st.write(f"<span style='font-size: 20px;'>Choose a headphone or let us recommend one:</span>", unsafe_allow_html=True)
-
-        headphone_selector = st.checkbox('Toggle Dropdown or Recommendation Selection', value=True)
+        st.write(f"<span style='font-size: 26px;'>SentiRec Analytics:</span>", unsafe_allow_html=True)
+        st.write(f"<span style='font-size: 20px;'>Choose a headphone:</span>", unsafe_allow_html=True)
 
 
-        selected_headphone_dropdown = st.selectbox('Select from collection', 
-                                                       prod_descriptions['headphoneName'])
-        if headphone_selector:
-            st.write('You selected the ', selected_headphone_dropdown)
-        else:
-            st.write('')
-            st.write('')
-
-
-        # Display the text area for user input
-        user_input = st.text_input("Describe your dream headphones here:", value='really good battery life and bass')
-        if user_input == '':
-            raise ValueError('Please enter a description.')
-
-        # Perform recommendation if user input is provided
-        if user_input:
-            top_recommendations = recommendations.get_recommendation(user_input)
-            selected_headphone_rec = top_recommendations[0]
-
-        if headphone_selector:
-            st.write('')
-            st.write('')
-        else:
-            st.write('We recommend the ', selected_headphone_rec)
-
-        if headphone_selector:
-            selected_headphone = selected_headphone_dropdown
-        else:
-            selected_headphone = selected_headphone_rec
+        selected_headphone = st.selectbox('Select from collection', prod_descriptions['headphoneName'], label_visibility='collapsed')
 
         st.write('')
         st.write(f"<span style='font-size: 20px;'>Highlight Features:</span>", unsafe_allow_html=True)
 
         selected_row = prod_descriptions[prod_descriptions['headphoneName'] == selected_headphone].iloc[0]
-        st.text_area("Highlight Features:", generate_features_text(selected_row['features']), height=500,label_visibility='collapsed')
+        st.text_area("Highlight Features:", generate_features_text(selected_row['features']), height=500, label_visibility='collapsed')
     
     main(selected_headphone, selected_row)
 
