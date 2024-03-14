@@ -39,34 +39,3 @@ class HeadphoneRecommendations:
         top_recommendations = top_recommendations.reset_index(drop = True)['headphoneName']
         
         return top_recommendations
-
-    
-def main():
-    parser = argparse.ArgumentParser(description="Headphone Recommendations Script")
-    parser.add_argument("--model", required=True, help="Path to the GloVe model file")
-    parser.add_argument("--reviews", required=True, help="Path to the reviews DataFrame (CSV file)")
-    args = parser.parse_args()
-
-    # Load the reviews DataFrame
-    reviews_df = pd.read_csv(args.reviews, converters={'ProductEmbedding': literal_eval})
-
-    # Initialize the recommendations class
-    recommendations = HeadphoneRecommendations(model_file=args.model, reviews_df=reviews_df)
-
-    # Get user input from command-line arguments
-    user_input = input("Enter your headphone preferences: ")
-
-    # Get recommendations for the user input
-    top_recommendations = recommendations.get_recommendation(user_input)
-    print("Top 5 Recommendations:")
-    print(top_recommendations)
-
-if __name__ == "__main__":
-    main()
-
-
-
-
-
-
-

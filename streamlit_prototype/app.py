@@ -1,63 +1,34 @@
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import os
 import re
-import requests
-from PIL import Image
-from io import BytesIO
 from scipy.stats import gaussian_kde
-from sqlalchemy import create_engine, inspect
 from ast import literal_eval
 import plotly.express as px
 import plotly.graph_objects as go
+from google.cloud import bigquery
+from google.cloud import storage
 import streamlit as st
-from streamlit_plotly_events import plotly_events
 from sklearn.metrics.pairwise import cosine_similarity
 from Get_Recommendations import HeadphoneRecommendations
 
 st.set_page_config(page_title="SentiRec Analytics", layout="wide")
 
+#connecting to google client
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../streamlit_prototype/sentirec-analytics-service-key.json"
+client = bigquery.Client()
+def get_bq_df(client, table, dataset='reviews_data', project_id='sentirec-analytics'):
+    query = f"""
+    SELECT *
+    FROM `{project_id}.{dataset}.{table}`
+    """
+    query_job = client.query(query)
+    return query_job.to_dataframe()
 
+headphones_fact_table = get_bq_df(client, 'headphones-fact-table')
+prod_descriptions = get_bq_df(client, 'amazon_product_descriptions')
+yt_df = get_bq_df(client, 'yt_reviews_gen_summaries')
 
-
-# Connection parameters
-server = 'RAVI-DESKTOP\SQLEXPRESS01'
-database = 'SentiRec_Analytics'
-username = 'RAVI-DESKTOP\RaviB'
-
-# Connection parameters
-driver = 'ODBC+Driver+17+for+SQL+Server'  # Adjust the driver name if needed
-
-# Create an SQLAlchemy engine
-engine = create_engine(f"mssql+pyodbc://{server}/{database}?driver={driver}")
-
-dataframes_dict = {}
-
-try:
-    # Create an inspector to inspect the database and get the tables names
-    inspector = inspect(engine)
-    table_names = inspector.get_table_names()
-
-    # Load each table into a Pandas DataFrame
-    for table_name in table_names:
-        df = pd.read_sql_table(table_name, con=engine)
-        # Display or process the DataFrame as needed
-        dataframes_dict[table_name] = df
-    
-
-
-except pd.errors.DatabaseError as e:
-    print("Error reading from the database:", e)
-
-finally:
-    # Dispose of the engine
-    engine.dispose()
-
-
-headphones_fact_table = dataframes_dict['headphones_fact_table']
-prod_descriptions = dataframes_dict['amazon_product_descriptions']
-yt_df = dataframes_dict['yt_reviews_gen_summaries']
 
 #getting df's for each aspect and leaving out rows with 0 scores
 battery_df = headphones_fact_table[['headphoneName', 'batteryLabel', 'batteryScore']].loc[headphones_fact_table['batteryScore'] != 0]
@@ -71,12 +42,19 @@ assert (noisecancellation_df['noisecancellationScore'] == 0).sum() == 0, "There 
 assert (soundquality_df['soundqualityScore'] == 0).sum() == 0, "There are zero values in the 'soundqualityScore' column."
 
 #Airpods 3 doesn't have values in this df
+prod_descriptions = prod_descriptions.rename({'Headphones': 'headphoneName'}, axis = 1) #forgot to rename headphone column in GCP
 prod_descriptions = prod_descriptions.drop(prod_descriptions[prod_descriptions['headphoneName'] == 'AirPods 3'].index)
 prod_descriptions['starsBreakdown'] = prod_descriptions['starsBreakdown'].apply(literal_eval)
 
-reviews_df = dataframes_dict['averaged_embeddings']
+#reviews_df = dataframes_dict['averaged_embeddings']
+reviews_df = get_bq_df(client, 'averaged_embeddings')
 reviews_df = reviews_df.drop(reviews_df[reviews_df['headphoneName'] == 'AirPods 3'].index)
 reviews_df['ProductEmbedding'] = reviews_df['ProductEmbedding'].apply(literal_eval)
+
+
+
+
+
 
 def clean_star_label(xstars):
     if xstars[0] != '1':
@@ -89,53 +67,6 @@ def generate_features_text(features):
     features_text = literal_eval(features)
     return '\n\n'.join([f'- {feature}' for feature in features_text])
 
-
-def avg_sentiment_scores(selected_headphone, selected_sentiment, battery_df, comfort_df, noisecancellation_df, soundquality_df):
-    # Create a grouped bar chart using plotly.graph_objects.Figure
-    fig = go.FigureWidget()
-    
-    # Check if a headphone is selected
-    if selected_headphone:
-        averages = []
-        labels = []
-
-        # Iterate through each DataFrame and calculate the average score for the selected sentiment
-        for df in [battery_df, comfort_df, noisecancellation_df, soundquality_df]:
-            filtered_df = df[df['headphoneName'] == selected_headphone]
-
-            # Check if the filtered DataFrame is not empty
-            if not filtered_df.empty:
-                aspect_name = filtered_df.columns[1].replace('Label', '')
-                avg_score = filtered_df[filtered_df['{}Label'.format(aspect_name)] == selected_sentiment]['{}Score'.format(aspect_name)].mean()
-                averages.append(avg_score)
-                labels.append(aspect_name)
-
-        
-        fig.add_trace(go.Bar(
-            x=labels,
-            y=averages,
-            name=selected_sentiment,
-            marker=dict(color='blue' if selected_sentiment == 'Positive' else '#D87093'),
-            hovertemplate='%{x}: %{y}<br>Sentiment: ' + selected_sentiment  # Add sentiment to hover template
-        ))
-        
-
-        # Update layout
-        fig.update_layout(
-            barmode='group',
-            title=f'Average {selected_sentiment} Rating for {selected_headphone}',
-            xaxis=dict(title='Aspect'),
-            yaxis=dict(title='Average Score'),
-            height=400,
-            width=400,
-            plot_bgcolor='black',
-            paper_bgcolor='black'
-        )
-    else:
-        # If no headphone is selected, display an empty figure
-        fig.update_layout(title='Please select a headphone to display data.')
-
-    return fig
 
 def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
     # Default aspect
@@ -432,7 +363,7 @@ if __name__ == "__main__":
     #st.markdown("<h1 style='margin-top: 0; text-align: center; color: black;'>Sentirec Analytics</h1>", unsafe_allow_html=True)
     #selected_headphone = st.selectbox('Select Headphone', prod_descriptions['headphoneName'])
 
-    recommendations = HeadphoneRecommendations(model_file='../modules/glove_model.gensim', reviews_df=reviews_df)
+    recommendations = HeadphoneRecommendations(model_file='glove_model.gensim', reviews_df=reviews_df)
 
     
     with st.sidebar:
