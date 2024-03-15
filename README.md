@@ -46,5 +46,6 @@ There is a lot more to be done in this project to make it better, but will be dr
 - Aspect based sentiment analysis should be revised, and NER should be used, or something to detect notable features per headphone, as not every headphone was made with certain aspects in mind so there was no sentiment scores for them.
 - Absa should be done on youtube reviews as well.
 - YouTube review summarization model can be fine tuned further.
+- Some sort of recommendation would ideally be added to make this more than just analytics. A recommendation from user text was already completed before using cosine similarity, so implementing that in the app would be the start.
 - The app should focus more on review analytics of youtube reviews since amazon review analytics are already done on the amazon website and are redundant.
 - The app itself needs to be redone with django or something else as streamlit is slow and elementary. 
