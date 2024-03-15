@@ -5,12 +5,10 @@ FROM python:3.9
 WORKDIR /app
 
 # Copy the current directory contents into the container at /app
-COPY . /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# Install any dependencies specified in requirements.txt
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=bind,source=requirements.txt,target=requirements.txt \
-    python -m pip install -r requirements.txt
+COPY . .
 
 # Expose the port where Streamlit will run the app
 EXPOSE 8080

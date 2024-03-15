@@ -3,19 +3,17 @@ import pandas as pd
 import os
 import re
 from scipy.stats import gaussian_kde
+import requests
 from ast import literal_eval
 import plotly.express as px
 import plotly.graph_objects as go
 from google.cloud import bigquery
-from google.cloud import storage
 import streamlit as st
-from sklearn.metrics.pairwise import cosine_similarity
-from Get_Recommendations import HeadphoneRecommendations
 
 st.set_page_config(page_title="SentiRec Analytics", layout="wide")
 
 #connecting to google client
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "../streamlit_prototype/sentirec-analytics-service-key.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "sentirec-analytics-service-key.json"
 client = bigquery.Client()
 def get_bq_df(client, table, dataset='reviews_data', project_id='sentirec-analytics'):
     query = f"""
@@ -120,6 +118,9 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
         title=dict(
             text="Feature Ratings Distribution<br>               (select above)",
             x=0.16,  # Center horizontally
+            font=dict(
+                color='rgba(3, 59, 92, 1)'
+            )
         ),
         #xaxis_title='Sentiment Score',
         #yaxis_title='Density',
@@ -132,15 +133,25 @@ def sentiment_distribution(selected_headphone, selected_sentiment, click_data):
             tickvals=custom_ticks,
             ticktext=custom_tick_labels,
             tickmode='array',
+            tickfont=dict(
+                color='rgba(3, 59, 92, 1)',
+                size=15
+            )
         ),
         yaxis=dict(showgrid=False, showticklabels=False),
     )
 
     return fig
 
-# Function to get the image filename based on the selected headphone
+# Function to get the image filename based on the selected headphone - for local directory
 def get_image_filename(headphone_name, image_dir = "translucent_images"):
     return os.path.join(image_dir, f"{headphone_name}.png")
+
+#this one gets image data from image address from internet - using github images for this
+def get_image(url):
+    response = requests.get(url)
+    img_data = response.content
+    return img_data
 
 #for plots so they change size when toggling side bar
 plot_style = """
@@ -189,7 +200,7 @@ def main(selected_headphone, selected_row):
         st.write(' ')   
         
         review_count = int(selected_row['reviewsCount'])
-        styled_text = f'<div style="font-size: 20px; padding: 10px; border: 0px solid #007bff; border-radius: 5px; text-align: center;">Number of Reviews:<br/><span style="font-size: 40px;">{review_count}</span></div>'
+        styled_text = f'<div style="font-size: 20px; padding: 10px; border: 0px solid #007bff; border-radius: 5px; text-align: center; color: #033b5c;">Number of Reviews:<br/><span style="font-size: 40px;">{review_count}</span></div>'
         st.write(styled_text, unsafe_allow_html=True)
         
         stars_labels = [clean_star_label(stars) for stars in list(selected_row['starsBreakdown'].keys())]
@@ -204,10 +215,18 @@ def main(selected_headphone, selected_row):
             title=dict(
                 text="Ratings Distribution",
                 x=0.3,  # Center horizontally
+                font=dict(
+                    color='rgba(3, 59, 92, 1)'
+                )
             ),
             plot_bgcolor='rgba(20, 170, 255, 0.1)',
             paper_bgcolor='rgba(0, 0, 255, 0.0)',
-            xaxis=dict(showgrid=False),
+            xaxis=dict(showgrid=False,
+                       tickfont=dict(
+                            color='rgba(3, 59, 92, 1)',
+                            size=15
+                        )
+            ),
             yaxis=dict(showgrid=False, showticklabels=False),
             #yaxis_title='Percentage',
             height=520,
@@ -227,10 +246,10 @@ def main(selected_headphone, selected_row):
         # Generate star graphics using Unicode characters
         rating = int(round(star_rating))
         stars = '★' * rating + '☆' * (5 - rating)
-        styled_stars = f'<div style="font-size: 3em; text-align: center; margin-top: -0.5em;">{stars}</div>'
+        styled_stars = f'<div style="font-size: 3em; text-align: center; margin-top: -0.5em; color: #033b5c;">{stars}</div>'
         centered_content = f"""
         <div style="text-align: center; margin-bottom: 0.5em;">
-            <h3 style="margin-bottom: 0;">Overall Rating:</h3>
+            <h3 style="margin-bottom: 0; color: #033b5c;">Overall Rating:</h3>
             {styled_stars}
         </div>
         """
@@ -239,22 +258,51 @@ def main(selected_headphone, selected_row):
         brand_name = selected_row['brand']
         centered_content_brand_name = f"""
         <div style="text-align: center; margin-bottom: 0.5em;">
-            <h4 style="margin-bottom: 0; font-size: 24px;">Brand Name:</h4>
-            <span style="font-size: 22px;">{brand_name}</span>
+            <h4 style="margin-bottom: 0; font-size: 24px; color: #033b5c;">Brand Name:</h4>
+            <span style="font-size: 22px; color: #033b5c;">{brand_name}</span>
         </div>
         """
         st.markdown(centered_content_brand_name, unsafe_allow_html=True)
 
         
         #displaying image of earbuds
-        image_filename = get_image_filename(selected_headphone)
+        #image_filename = get_image_filename(selected_headphone)
         
+        if selected_headphone == '1MORE Evo':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/1MORE%20Evo.png?raw=true'
+        elif selected_headphone == 'AirPods Pro 2 Earbuds':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/AirPods%20Pro%202%20Earbuds.png?raw=true'
+        elif selected_headphone == 'Beats Fit Pro Earbuds':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Beats%20Fit%20Pro%20Earbuds.png?raw=true'
+        elif selected_headphone == 'Bose Quietcomfort Earbuds':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Bose%20Quietcomfort%20Earbuds.png?raw=true'
+        elif selected_headphone == 'Bose Quietcomfort Earbuds 2':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Bose%20Quietcomfort%20Earbuds%202.png?raw=true'
+        elif selected_headphone == 'Galaxy Buds2 Pro':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Galaxy%20Buds2%20Pro.png?raw=true'
+        elif selected_headphone == 'Jabra Elite 7 Pro':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Jabra%20Elite%207%20Pro.png?raw=true'
+        elif selected_headphone == 'lg tone tf8':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/lg%20tone%20tf8.png?raw=true'
+        elif selected_headphone == 'Pixel Buds Pro':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Pixel%20Buds%20Pro.png?raw=true'
+        elif selected_headphone == 'Sennheiser MTW3':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sennheiser%20MTW3.png?raw=true'
+        elif selected_headphone == 'Sony Linkbuds original':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sony%20Linkbuds%20original.png?raw=true'
+        elif selected_headphone == 'Sony Linkbuds S':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sony%20Linkbuds%20S.png?raw=true'
+        elif selected_headphone == 'Sony WF-1000XM5':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sony%20WF-1000XM5.png?raw=true'
+        elif selected_headphone == 'sony xm4 earbuds':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/sony%20xm4%20earbuds.png?raw=true'
+        elif selected_headphone == 'Soundcore Liberty 3':
+            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Soundcore%20Liberty%203.png?raw=true'
         
-        if os.path.exists(image_filename):
-            columns = st.columns((0.5, 12, 0.5))
-            columns[1].image(image_filename, caption=None, use_column_width=True)
-        else:
-            st.write("Image not found.")
+        columns = st.columns((0.5, 12, 0.5))
+        img_data = get_image(url)
+        columns[1].image(img_data, caption=None, use_column_width=True)
+        #columns[1].image(image_filename, caption=None, use_column_width=True)
             
         st.write('')
         st.write('')
@@ -270,10 +318,10 @@ def main(selected_headphone, selected_row):
         #this centers and fixes everything, including elements in the other columns, to stay centered
         st.markdown("<style>div[data-testid='stHorizontalBlock']>div{display: flex; justify-content: center;}</style>", unsafe_allow_html=True)
         
-        styled_text_absa = f'<div style="font-size: 20px; padding: 10px; border: 0px solid #007bff; border-radius: 5px; text-align: center;">Feature Scores<br/></div>'
+        styled_text_absa = f'<div style="font-size: 20px; padding: 10px; border: 0px solid #007bff; border-radius: 5px; text-align: center; color: #033b5c;">Feature Scores<br/></div>'
         st.write(styled_text_absa, unsafe_allow_html=True)
         
-        check_sentiment = st.checkbox('Toggle Positive or Negative Sentiment', value=True)
+        check_sentiment = st.checkbox(':blue[Toggle Positive or Negative Sentiment]', value=True)
         if check_sentiment:
             selected_sentiment = 'Positive'
         else:
@@ -322,8 +370,8 @@ def main(selected_headphone, selected_row):
                     index = i * num_columns + j
                     with columns[j]:
                         #st.write(aspects[index])
-                        st.write(f'<div style="font-size: 16px;">{aspects[index]}</div>', unsafe_allow_html=True)
-                        if st.button(sentiment_ratings_out_of_five[index], key=labels[index]):
+                        st.write(f'<div style="font-size: 16px; color: #033b5c;">{aspects[index]}</div>', unsafe_allow_html=True)
+                        if st.button(f":blue[{sentiment_ratings_out_of_five[index]}]", key=labels[index]):
                             aspect = labels[index]
 
             # Deal with the last set of rows (if not a multiple of num_columns)
@@ -332,8 +380,8 @@ def main(selected_headphone, selected_row):
                     index = num_full_sets * num_columns + i
                     with columns[i]:
                         #st.write(aspects[index])
-                        st.write(f'<div style="font-size: 16px;">{aspects[index]}</div>', unsafe_allow_html=True)
-                        if st.button(sentiment_ratings_out_of_five[index], key=labels[index]):
+                        st.write(f'<div style="font-size: 16px; color: #033b5c;">{aspects[index]}</div>', unsafe_allow_html=True)
+                        if st.button(f":blue[{sentiment_ratings_out_of_five[index]}]", key=labels[index]):
                             aspect = labels[index]
         
         # Display sentiment distribution
@@ -342,13 +390,13 @@ def main(selected_headphone, selected_row):
         st.plotly_chart(absa_distribution, use_container_width=True, className="stPlot")
         #st.plotly_chart(absa_distribution)
 
-
+#https://w.forfun.com/fetch/09/09fd60caa86f9743e9ebdc98c944a335.jpeg
 if __name__ == "__main__":
     st.markdown(
         """
         <style>
         .stApp {
-            background-image: url('https://w.forfun.com/fetch/09/09fd60caa86f9743e9ebdc98c944a335.jpeg');
+            background-image: url('https://t4.ftcdn.net/jpg/03/81/60/07/360_F_381600744_sjFtJGWmismEgTtTcPmxscPlM0fcytfh.jpg');
             background-size: cover;
         }
         </style>
@@ -381,7 +429,7 @@ if __name__ == "__main__":
 
 
     
-    with st.expander('See what YouTubers are saying...'):
+    with st.expander(':blue[See what YouTubers are saying...]'):
         num_columns = 3
 
         # Calculate the number of rows
@@ -398,9 +446,9 @@ if __name__ == "__main__":
                 row = i * num_columns + j
                 youtuber, vid_link, summary = get_yt_summaries(filtered_yt_df, row)
                 with columns[j]:
-                    st.write(f"<span style='font-size: 20px;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px; color: #0067b0;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
                     st.write(f"<span style='font-size: 20px;'><a href='{vid_link}' target='_blank'>Youtuber's Video Review Direct Link</a></span>", unsafe_allow_html=True)
-                    st.write(f"<span style='font-size: 20px;'>Video Review Summary:</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px; color: #0067b0;'>Video Review Summary:</span>", unsafe_allow_html=True)
                     st.text_area('Summary:', summary, height=350, label_visibility='collapsed')
 
         # Deal with the last set of rows (if not a multiple of num_columns)
@@ -409,8 +457,8 @@ if __name__ == "__main__":
                 row = num_full_sets * num_columns + i
                 youtuber, vid_link, summary = get_yt_summaries(filtered_yt_df, row)
                 with columns[i]:
-                    st.write(f"<span style='font-size: 20px;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px; color: #0067b0;'>Youtuber: {youtuber}</span>", unsafe_allow_html=True)
                     st.write(f"<span style='font-size: 20px;'><a href='{vid_link}' target='_blank'>Youtuber's Video Review Direct Link</a></span>", unsafe_allow_html=True)
-                    st.write(f"<span style='font-size: 20px;'>Video Review Summary:</span>", unsafe_allow_html=True)
+                    st.write(f"<span style='font-size: 20px; color: #0067b0;'>Video Review Summary:</span>", unsafe_allow_html=True)
                     st.text_area('Summary:', summary, height=350, label_visibility='collapsed')
     
