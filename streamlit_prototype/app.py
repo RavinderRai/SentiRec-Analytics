@@ -269,35 +269,35 @@ def main(selected_headphone, selected_row):
         #image_filename = get_image_filename(selected_headphone)
         
         if selected_headphone == '1MORE Evo':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/1MORE%20Evo.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/1MORE%20Evo.png'
         elif selected_headphone == 'AirPods Pro 2 Earbuds':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/AirPods%20Pro%202%20Earbuds.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/AirPods%20Pro%202%20Earbuds.png'
         elif selected_headphone == 'Beats Fit Pro Earbuds':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Beats%20Fit%20Pro%20Earbuds.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Beats%20Fit%20Pro%20Earbuds.png'
         elif selected_headphone == 'Bose Quietcomfort Earbuds':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Bose%20Quietcomfort%20Earbuds.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Bose%20Quietcomfort%20Earbuds.png'
         elif selected_headphone == 'Bose Quietcomfort Earbuds 2':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Bose%20Quietcomfort%20Earbuds%202.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Bose%20Quietcomfort%20Earbuds%202.png'
         elif selected_headphone == 'Galaxy Buds2 Pro':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Galaxy%20Buds2%20Pro.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Galaxy%20Buds2%20Pro.png'
         elif selected_headphone == 'Jabra Elite 7 Pro':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Jabra%20Elite%207%20Pro.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Jabra%20Elite%207%20Pro.png'
         elif selected_headphone == 'lg tone tf8':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/lg%20tone%20tf8.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/lg%20tone%20tf8.png'
         elif selected_headphone == 'Pixel Buds Pro':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Pixel%20Buds%20Pro.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Pixel%20Buds%20Pro.png'
         elif selected_headphone == 'Sennheiser MTW3':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sennheiser%20MTW3.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Sennheiser%20MTW3.png'
         elif selected_headphone == 'Sony Linkbuds original':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sony%20Linkbuds%20original.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Sony%20Linkbuds%20original.png'
         elif selected_headphone == 'Sony Linkbuds S':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sony%20Linkbuds%20S.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Sony%20Linkbuds%20S.png'
         elif selected_headphone == 'Sony WF-1000XM5':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Sony%20WF-1000XM5.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Sony%20WF-1000XM5.png'
         elif selected_headphone == 'sony xm4 earbuds':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/sony%20xm4%20earbuds.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/sony%20xm4%20earbuds.png'
         elif selected_headphone == 'Soundcore Liberty 3':
-            url = 'https://github.com/RavinderRai/SentiRec-Analytics/blob/main/streamlit_prototype/translucent_images/Soundcore%20Liberty%203.png?raw=true'
+            url = 'https://raw.githubusercontent.com/RavinderRai/SentiRec-Analytics/main/modules/translucent_images/Soundcore%20Liberty%203.png'
         
         columns = st.columns((0.5, 12, 0.5))
         img_data = get_image(url)
